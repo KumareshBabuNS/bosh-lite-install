@@ -2,7 +2,6 @@
 . logMessages.sh
 
 installRequiredGems () {
-	set -e
 	INSTALLED_BUNDLE_VERSION=`which bundle` >> $LOG_FILE 2>&1
 	if [ -z $INSTALLED_BUNDLE_VERSION ]; then
 		rvm use $1
