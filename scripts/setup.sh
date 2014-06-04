@@ -97,6 +97,7 @@ fi
 export EXPECTED_RUBY_VERSION_BOSH=`cat $BOSH_RELEASES_DIR/bosh-lite/.ruby-version`
 export EXPECTED_RUBY_VERSION_CF_RELEASE=`cat $BOSH_RELEASES_DIR/cf-release/.ruby-version`
 
+set +e
 ./ruby_install.sh
 
 INSTALLED_WGET=`which wget`
@@ -112,7 +113,6 @@ if [ -z "$INSTALLED_SPIFF" ]; then
 	brew install spiff &> $LOG_FILE 2>&1
 fi
 
-set +e
 echo "###### Switching to bosh-lite ######"
 cd $BOSH_RELEASES_DIR/bosh-lite  &> $LOG_FILE 2>&1
 
