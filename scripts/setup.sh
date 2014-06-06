@@ -219,23 +219,20 @@ set +e
 logCustom 9 "###### Deploy CF to BOSH-LITE (THIS WOULD TAKE SOME TIME) ######"
 echo "yes" | bosh deploy &> $LOG_FILE 2>&1
 
-set -e
 echo "###### Executing BOSH VMS to ensure all VMS are running ######"
 BOSH_VMS_INSTALLED_SUCCESSFULLY=$( bosh vms | grep -o "failing" )
 if [ ! -z "$BOSH_VMS_INSTALLED_SUCCESSFULLY" ]; then
 	logError "Not all BOSH VMs are up. Please check logs for more info"
 fi
 
+set -e
 echo "###### Setup cloudfoundry cli ######"
 GO_CF_VERSION=`which gcf`
 if [ -z "$GO_CF_VERSION" ]; then
 	brew install cloudfoundry-cli
+	echo $PASSWORD | sudo -S ln -s /usr/local/bin/cf /usr/local/bin/gcf
 fi
 
-set +e
-echo $PASSWORD | sudo -S ln -s /usr/local/bin/cf /usr/local/bin/gcf
-
-set -e
 echo "###### Setting up cf (Create org, spaces) ######"
 gcf api --skip-ssl-validation $CLOUD_CONTROLLER_URL
 gcf auth $CF_USER $CF_PASSWORD
