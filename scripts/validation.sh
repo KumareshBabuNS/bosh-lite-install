@@ -1,12 +1,8 @@
 #!/bin/bash
 . logMessages.sh
 
-if [[ -n ${1//[0-9]/} ]]; then
-	logError "Invalid cf version number, please try again"
-fi
-
-if [ $2 -eq 1 ] || [ $2 -eq 2 ]; then
-	if [ $2 -eq 1 ]; then 
+if [ $1 -eq 1 ] || [ $1 -eq 2 ]; then
+	if [ $1 -eq 1 ]; then 
 		logInfo "Provider selected : Virtual Box" 
 		VIRTUAL_BOX_INSTALLED=`which virtualbox`
 		if [ -z $VIRTUAL_BOX_INSTALLED ]; then
