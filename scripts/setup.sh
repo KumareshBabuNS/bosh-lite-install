@@ -36,19 +36,19 @@ export RVM_DOWNLOAD_URL=https://get.rvm.io
 export HOMEBREW_DOWNLOAD_URL=https://raw.github.com/Homebrew/homebrew/go/install
 
 export LINUXBREW_GIT_REPO=https://github.com/Homebrew/linuxbrew.git
+export PROVIDER=$1
 
 . logMessages.sh
 
 echo "######  Install Open Source CloudFoundry ######"
-if [ $# -ne 2 ]; then
-	echo "Usage: ./setup.sh <cf-release-version> <provider>"
-	printf "\t %s \t %s \n" "cf-release-version:" "Cloud foundry version to deploy on vagrant"
+if [ $# -ne 1 ]; then
+	echo "Usage: ./setup.sh <provider>"
 	printf "\t %s \t\t %s \n\t\t\t\t %s \n" "provider:" "Enter 1 for Virtual Box" "Enter 2 for VMWare Fusion"
 	exit 1
 fi
 
 set -e
-./validation.sh $1 $2
+./validation.sh $PROVIDER
 
 read -s -p "Enter Password: " PASSWORD
 if [ -z $PASSWORD ]; then
@@ -73,9 +73,6 @@ fi
 
 ./brew_install.sh
 
-export CF_RELEASE=cf-$1.yml
-logInfo "Deploy CF release $CF_RELEASE"
-
 echo "###### Clone Required Git Repositories ######"
 if [ ! -d "bosh-lite" ]; then
 	git clone $BOSH_LITE_REPO bosh-lite >> $LOG_FILE 2>&1
@@ -89,13 +86,18 @@ if [ ! -d "cf-acceptance-tests" ]; then
 	git clone $CF_ACCEPTANCE_TESTS_REPO cf-acceptance-tests >> $LOG_FILE 2>&1
 fi
 
+export CF_LATEST_RELEASE_VERSION=`tail -1 $BOSH_RELEASES_DIR/cf-release/releases/index.yml | cut -d':' -f2 | cut -d' ' -f2`
+logInfo "This is the version $CF_LATEST_RELEASE_VERSION"
+export CF_RELEASE=cf-$CF_LATEST_RELEASE_VERSION.yml
+logInfo "Deploy CF release $CF_RELEASE"
+
 echo "###### Validate the entered cf version ######"
 if [ ! -f $BOSH_RELEASES_DIR/cf-release/releases/$CF_RELEASE ]; then
 	logError "Invalid CF version selected. Please correct and try again"
 fi
 
-export EXPECTED_RUBY_VERSION_BOSH=`cat $BOSH_RELEASES_DIR/bosh-lite/.ruby-version`
-export EXPECTED_RUBY_VERSION_CF_RELEASE=`cat $BOSH_RELEASES_DIR/cf-release/.ruby-version`
+export EXPECTED_RUBY_VERSION_BOSH="1.9.3-p484"
+export EXPECTED_RUBY_VERSION_CF_RELEASE="1.9.3-p484"
 
 set +e
 ./ruby_install.sh
@@ -158,7 +160,7 @@ fi
 set -e
 
 echo "###### Vagrant up ######"
-if [ $2 -eq 1 ]; then
+if [ $PROVIDER -eq 1 ]; then
 	if [ $PLUGIN_INSTALLED == true ]; then
 		logInfo "Found VMWare Fusion plugin, uninstalling it"
 		vagrant plugin uninstall vagrant-vmware-fusion

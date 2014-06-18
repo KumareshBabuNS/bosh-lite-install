@@ -26,8 +26,7 @@ Install Open Source CloudFoundry
 
 ```
 ######  Install Open Source CloudFoundry ######
-Usage: ./setup.sh <cf-release-version> <provider>
-	 cf-release-version: 	 Cloud foundry version to deploy on vagrant 
+Usage: ./setup.sh <provider>
 	 provider: 		         Enter 1 for Virtual Box 
 							 Enter 2 for VMWare Fusion 
 
