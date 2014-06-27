@@ -6,6 +6,7 @@ logError () {
 	fi	
 
 	echo ">>>>>>>>>> End time: $(date) <<<<<<<<<<<<"
+	echo ">>>>>>>>>> End time: $(date) <<<<<<<<<<<<" >> $LOG_FILE 2>&1
 	exit 1
 }
 
@@ -20,5 +21,6 @@ logInfo () {
 logCustom () {
 	tput setaf $1
 	echo "$2"
+	echo "$2" >> $LOG_FILE 2>&1
 	tput sgr 0	
 }
