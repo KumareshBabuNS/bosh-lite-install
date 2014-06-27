@@ -5,9 +5,8 @@ unset HISTFILE
 
 echo ">>>>>>>>>> Start time: $(date) <<<<<<<<<<<<"
 
-export BOSH_RELEASES_DIR=$PWD
-export LOG_FILE=$BOSH_RELEASES_DIR/setup.log
-
+export EXECUTION_DIR=$PWD
+export LOG_FILE=$EXECUTION_DIR/setup.log
 rm -rf $LOG_FILE
 
 echo ">>>>>>>>>> Start time: $(date) <<<<<<<<<<<<" >> $LOG_FILE
@@ -41,11 +40,18 @@ export PROVIDER=$1
 . logMessages.sh
 
 echo "######  Install Open Source CloudFoundry ######"
-if [ $# -ne 1 ]; then
-	echo "Usage: ./setup.sh <provider>"
+if [ $# -ne 2 ]; then
+	echo "Usage: ./setup.sh <provider> <install-dir>"
 	printf "\t %s \t\t %s \n\t\t\t\t %s \n" "provider:" "Enter 1 for Virtual Box" "Enter 2 for VMWare Fusion"
+	printf "\t %s \t\t %s \n" "install-dir:" "Specify the install directory"
 	exit 1
 fi
+
+if [ ! -d $2 ]; then
+	logError "Non-existant directory: $2"
+fi
+
+export BOSH_RELEASES_DIR=$2
 
 set -e
 ./validation.sh $PROVIDER
@@ -57,7 +63,7 @@ fi
 
 echo
 
-cmd=`$BOSH_RELEASES_DIR/login.sh $USER $PASSWORD`
+cmd=`$EXECUTION_DIR/login.sh $USER $PASSWORD`
 if [[ $cmd == *Sorry* ]]; then
 	logError "Invalid password"
 else 
@@ -75,19 +81,15 @@ fi
 
 echo "###### Clone Required Git Repositories ######"
 if [ ! -d "bosh-lite" ]; then
-	git clone $BOSH_LITE_REPO bosh-lite >> $LOG_FILE 2>&1
+	git clone $BOSH_LITE_REPO $BOSH_RELEASES_DIR/bosh-lite >> $LOG_FILE 2>&1
 fi
 
 if [ ! -d "cf-release" ]; then
-	git clone $CF_RELEASE_REPO cf-release >> $LOG_FILE 2>&1
-fi
-
-if [ ! -d "cf-acceptance-tests" ]; then
-	git clone $CF_ACCEPTANCE_TESTS_REPO cf-acceptance-tests >> $LOG_FILE 2>&1
+	git clone $CF_RELEASE_REPO $BOSH_RELEASES_DIR/cf-release >> $LOG_FILE 2>&1
 fi
 
 export CF_LATEST_RELEASE_VERSION=`tail -1 $BOSH_RELEASES_DIR/cf-release/releases/index.yml | cut -d':' -f2 | cut -d' ' -f2`
-logInfo "This is the version $CF_LATEST_RELEASE_VERSION"
+logInfo "Latest version of Cloud Foundry is: $CF_LATEST_RELEASE_VERSION"
 export CF_RELEASE=cf-$CF_LATEST_RELEASE_VERSION.yml
 logInfo "Deploy CF release $CF_RELEASE"
 
