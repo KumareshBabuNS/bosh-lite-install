@@ -29,10 +29,11 @@ Install Open Source CloudFoundry
 Usage: ./setup.sh <provider>
 	 provider: 		         Enter 1 for Virtual Box 
 							 Enter 2 for VMWare Fusion 
-
+	 install-dir: 		     Specify the install directory 
 ```
 
-ex: ./setup.sh 172 1
+ex: ./setup.sh 1 ~/Documents/cloudfoundry
+Note: Please create this directory before running the script.
 
 Enter the password when prompted.
 
@@ -59,4 +60,3 @@ If the script fails due to any reason, look at the errors in the setup.log
 
 RoadMap:
 * Enable install on Ubuntu
-* Harden the error handling
