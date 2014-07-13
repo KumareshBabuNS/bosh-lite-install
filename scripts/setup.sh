@@ -66,7 +66,7 @@ echo
 cmd=`$EXECUTION_DIR/login.sh $USER $PASSWORD`
 if [[ $cmd == *Sorry* ]]; then
 	logError "Invalid password"
-else 
+else
 	logSuccess "Password Validated"
 fi
 
@@ -80,11 +80,11 @@ fi
 ./brew_install.sh
 
 echo "###### Clone Required Git Repositories ######"
-if [ ! -d "bosh-lite" ]; then
+if [ ! -d "$BOSH_RELEASES_DIR/bosh-lite" ]; then
 	git clone $BOSH_LITE_REPO $BOSH_RELEASES_DIR/bosh-lite >> $LOG_FILE 2>&1
 fi
 
-if [ ! -d "cf-release" ]; then
+if [ ! -d "$BOSH_RELEASES_DIR/cf-release" ]; then
 	git clone $CF_RELEASE_REPO $BOSH_RELEASES_DIR/cf-release >> $LOG_FILE 2>&1
 fi
 
@@ -128,7 +128,7 @@ echo "###### Download warden ######"
 if [ ! -f $STEM_CELL_TO_INSTALL ]; then
     echo "###### Downloading... warden ######"
     wget --progress=bar:force $STEM_CELL_URL -o $LOG_FILE 2>&1
-else 
+else
 	logInfo "Skipping warden download, local copy exists"
 fi
 
@@ -167,16 +167,16 @@ if [ $PROVIDER -eq 1 ]; then
 		logInfo "Found VMWare Fusion plugin, uninstalling it"
 		vagrant plugin uninstall vagrant-vmware-fusion
 	fi
-	
+
 	vagrant up >> $LOG_FILE 2>&1
 else
 	if [ $PLUGIN_INSTALLED == true ]; then
 		logInfo "Vagrant Plugin already installed"
-	else	
+	else
 		vagrant plugin install vagrant-vmware-fusion >> $LOG_FILE 2>&1
 		vagrant plugin license vagrant-vmware-fusion $BOSH_RELEASES_DIR/license.lic >> $LOG_FILE 2>&1
 	fi
-	
+
 	vagrant up --provider vmware_fusion >> $LOG_FILE 2>&1
 fi
 
