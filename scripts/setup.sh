@@ -11,15 +11,9 @@ rm -rf $LOG_FILE
 
 echo ">>>>>>>>>> Start time: $(date) <<<<<<<<<<<<" >> $LOG_FILE
 
+export BOSH_DIRECTOR_URL=192.168.50.4:25555
 export BOSH_USER=admin
 export BOSH_PASSWORD=admin
-export CF_USER=admin
-export CF_PASSWORD=admin
-
-export BOSH_DIRECTOR_URL=192.168.50.4:25555
-export CLOUD_CONTROLLER_URL=https://api.10.244.0.34.xip.io/
-export ORG_NAME=local
-export SPACE_NAME=development
 
 export BOSH_LITE_REPO=https://github.com/cloudfoundry/bosh-lite.git
 export CF_RELEASE_REPO=https://github.com/cloudfoundry/cf-release.git
@@ -40,10 +34,11 @@ export PROVIDER=$1
 . logMessages.sh
 
 echo "######  Install Open Source CloudFoundry ######"
-if [ $# -ne 2 ]; then
+if [ $# -lt 2 ]; then
 	echo "Usage: ./setup.sh <provider> <install-dir>"
 	printf "\t %s \t\t %s \n\t\t\t\t %s \n" "provider:" "Enter 1 for Virtual Box" "Enter 2 for VMWare Fusion"
 	printf "\t %s \t\t %s \n" "install-dir:" "Specify the install directory"
+	printf "\t %s \t\t\t %s \n" "-f" "Force remove old installation and install fresh"
 	exit 1
 fi
 
@@ -82,6 +77,8 @@ fi
 echo "###### Clone Required Git Repositories ######"
 if [ ! -d "$BOSH_RELEASES_DIR/bosh-lite" ]; then
 	git clone $BOSH_LITE_REPO $BOSH_RELEASES_DIR/bosh-lite >> $LOG_FILE 2>&1
+elif [ $3 == "-f" ]; then
+	./perform_cleanup.sh
 fi
 
 if [ ! -d "$BOSH_RELEASES_DIR/cf-release" ]; then
@@ -229,21 +226,7 @@ if [ ! -z "$BOSH_VMS_INSTALLED_SUCCESSFULLY" ]; then
 	logError "Not all BOSH VMs are up. Please check logs for more info"
 fi
 
-set -e
-echo "###### Setup cloudfoundry cli ######"
-GO_CF_VERSION=`which gcf`
-if [ -z "$GO_CF_VERSION" ]; then
-	brew install cloudfoundry-cli
-	echo $PASSWORD | sudo -S ln -s /usr/local/bin/cf /usr/local/bin/gcf
-fi
-
-echo "###### Setting up cf (Create org, spaces) ######"
-gcf api --skip-ssl-validation $CLOUD_CONTROLLER_URL
-gcf auth $CF_USER $CF_PASSWORD
-gcf create-org $ORG_NAME
-gcf target -o $ORG_NAME
-gcf create-space $SPACE_NAME
-gcf target -o $ORG_NAME -s $SPACE_NAME
+./setup_cf_commandline.sh
 
 echo ">>>>>>>>>> End time: $(date) <<<<<<<<<<<<"
 echo ">>>>>>>>>> End time: $(date) <<<<<<<<<<<<" >> $LOG_FILE
