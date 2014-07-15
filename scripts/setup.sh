@@ -72,13 +72,13 @@ if [ -z $VAGRANT_INSTALLED ]; then
 	logError "You don't have vagrant Installed. I knew you would never read instructions. Install that first and then come back."
 fi
 
-./brew_install.sh
+$EXECUTION_DIR/brew_install.sh
 
 echo "###### Clone Required Git Repositories ######"
 if [ ! -d "$BOSH_RELEASES_DIR/bosh-lite" ]; then
 	git clone $BOSH_LITE_REPO $BOSH_RELEASES_DIR/bosh-lite >> $LOG_FILE 2>&1
 elif [ $3 == "-f" ]; then
-	./perform_cleanup.sh
+	$EXECUTION_DIR/perform_cleanup.sh
 fi
 
 if [ ! -d "$BOSH_RELEASES_DIR/cf-release" ]; then
@@ -99,7 +99,7 @@ export EXPECTED_RUBY_VERSION_BOSH="1.9.3-p484"
 export EXPECTED_RUBY_VERSION_CF_RELEASE="1.9.3-p484"
 
 set +e
-./ruby_install.sh
+$EXECUTION_DIR/ruby_install.sh
 
 INSTALLED_WGET=`which wget`
 if [ -z "$INSTALLED_WGET" ]; then
@@ -171,7 +171,7 @@ else
 		logInfo "Vagrant Plugin already installed"
 	else
 		vagrant plugin install vagrant-vmware-fusion >> $LOG_FILE 2>&1
-		vagrant plugin license vagrant-vmware-fusion $BOSH_RELEASES_DIR/license.lic >> $LOG_FILE 2>&1
+		vagrant plugin license vagrant-vmware-fusion $EXECUTION_DIR/license.lic >> $LOG_FILE 2>&1
 	fi
 
 	vagrant up --provider vmware_fusion >> $LOG_FILE 2>&1
@@ -226,7 +226,7 @@ if [ ! -z "$BOSH_VMS_INSTALLED_SUCCESSFULLY" ]; then
 	logError "Not all BOSH VMs are up. Please check logs for more info"
 fi
 
-./setup_cf_commandline.sh
+$EXECUTION_DIR/setup_cf_commandline.sh
 
 echo ">>>>>>>>>> End time: $(date) <<<<<<<<<<<<"
 echo ">>>>>>>>>> End time: $(date) <<<<<<<<<<<<" >> $LOG_FILE
