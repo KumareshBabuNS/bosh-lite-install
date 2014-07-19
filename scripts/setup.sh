@@ -86,6 +86,11 @@ if [ ! -d "$BOSH_RELEASES_DIR/cf-release" ]; then
 fi
 
 export CF_LATEST_RELEASE_VERSION=`tail -1 $BOSH_RELEASES_DIR/cf-release/releases/index.yml | cut -d':' -f2 | cut -d' ' -f2`
+
+if [[ -n ${CF_LATEST_RELEASE_VERSION//[0-9]/} ]]; then
+	export CF_LATEST_RELEASE_VERSION=`echo $CF_LATEST_RELEASE_VERSION | tr -d "'"`
+fi
+
 logInfo "Latest version of Cloud Foundry is: $CF_LATEST_RELEASE_VERSION"
 export CF_RELEASE=cf-$CF_LATEST_RELEASE_VERSION.yml
 logInfo "Deploy CF release $CF_RELEASE"
