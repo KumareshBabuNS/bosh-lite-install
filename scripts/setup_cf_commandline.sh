@@ -1,5 +1,4 @@
 #!/bin/bash
-. logMessages.sh
 
 export CF_USER=admin
 export CF_PASSWORD=admin
@@ -11,14 +10,14 @@ set -e
 echo "###### Setup cloudfoundry cli ######"
 GO_CF_VERSION=`which cf`
 if [ -z "$GO_CF_VERSION" ]; then
-  brew install cloudfoundry-cli
+  brew install cloudfoundry-cli >> $LOG_FILE 2>&1
 #	echo $PASSWORD | sudo -S ln -s /usr/local/bin/cf /usr/local/bin/gcf
 fi
 
 echo "###### Setting up cf (Create org, spaces) ######"
-cf api --skip-ssl-validation $CLOUD_CONTROLLER_URL
-cf auth $CF_USER $CF_PASSWORD
-cf create-org $ORG_NAME
-cf target -o $ORG_NAME
-cf create-space $SPACE_NAME
-cf target -o $ORG_NAME -s $SPACE_NAME
+cf api --skip-ssl-validation $CLOUD_CONTROLLER_URL >> $LOG_FILE 2>&1
+cf auth $CF_USER $CF_PASSWORD >> $LOG_FILE 2>&1
+cf create-org $ORG_NAME >> $LOG_FILE 2>&1
+cf target -o $ORG_NAME >> $LOG_FILE 2>&1
+cf create-space $SPACE_NAME >> $LOG_FILE 2>&1
+cf target -o $ORG_NAME -s $SPACE_NAME >> $LOG_FILE 2>&1
