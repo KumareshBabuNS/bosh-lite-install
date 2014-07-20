@@ -103,9 +103,9 @@ fi
 export EXPECTED_RUBY_VERSION_BOSH="1.9.3-p484"
 export EXPECTED_RUBY_VERSION_CF_RELEASE="1.9.3-p484"
 
-set +e
 $EXECUTION_DIR/ruby_install.sh
 
+set +e
 INSTALLED_WGET=`which wget`
 if [ -z "$INSTALLED_WGET" ]; then
 	echo "###### Installing wget ######"
