@@ -100,8 +100,8 @@ if [ ! -f $BOSH_RELEASES_DIR/cf-release/releases/$CF_RELEASE ]; then
 	logError "Invalid CF version selected. Please correct and try again"
 fi
 
-export EXPECTED_RUBY_VERSION_BOSH="1.9.3-p484"
-export EXPECTED_RUBY_VERSION_CF_RELEASE="1.9.3-p484"
+export EXPECTED_RUBY_VERSION_BOSH="1.9.3-p547"
+export EXPECTED_RUBY_VERSION_CF_RELEASE="1.9.3-p547"
 
 $EXECUTION_DIR/ruby_install.sh
 
