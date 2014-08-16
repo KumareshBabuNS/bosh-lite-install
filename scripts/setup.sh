@@ -74,8 +74,10 @@ install_required_tools() {
 
 	$EXECUTION_DIR/brew_install.sh
 
+	set +e
 	$EXECUTION_DIR/ruby_install.sh
 
+	set -e
 	INSTALLED_WGET=`which wget`
 	if [ -z "$INSTALLED_WGET" ]; then
 		echo "###### Installing wget ######"
