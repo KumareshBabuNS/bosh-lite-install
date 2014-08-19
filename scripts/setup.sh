@@ -250,7 +250,6 @@ begin_deployment() {
 }
 
 setup_dev_environment() {
-	set -e
 	$EXECUTION_DIR/setup_cf_commandline.sh
 }
 
