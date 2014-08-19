@@ -10,6 +10,7 @@ set -e
 echo "###### Setup cloudfoundry cli ######"
 GO_CF_VERSION=`which cf`
 if [ -z "$GO_CF_VERSION" ]; then
+  brew tap pivotal/tap >> $LOG_FILE 2>&1
   brew install cloudfoundry-cli >> $LOG_FILE 2>&1
 #	echo $PASSWORD | sudo -S ln -s /usr/local/bin/cf /usr/local/bin/gcf
 fi
