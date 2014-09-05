@@ -24,12 +24,9 @@ export STEM_CELL_TO_INSTALL=latest-bosh-stemcell-warden.tgz
 export STEM_CELL_URL=$AWS_STEM_CELL_URL/$STEM_CELL_TO_INSTALL
 
 export VAGRANT_VERSION=1.6.2
+export RUBY_VERSION=2.1.1
 
-export RVM_DOWNLOAD_URL=https://get.rvm.io
 export HOMEBREW_DOWNLOAD_URL=https://raw.github.com/Homebrew/homebrew/go/install
-
-export EXPECTED_RUBY_VERSION_BOSH="1.9.3-p547"
-export EXPECTED_RUBY_VERSION_CF_RELEASE="1.9.3-p547"
 
 export LINUXBREW_GIT_REPO=https://github.com/Homebrew/linuxbrew.git
 
@@ -41,7 +38,6 @@ execute() {
 	install_required_tools
 	update_repos
 	export_cf_release
-	generate_bundles
 	download_stemcell
 	vagrant_up
 	begin_deployment
@@ -113,7 +109,9 @@ update_repos() {
 	echo "###### Clone Required Git Repositories ######"
 	if [ ! -d "$BOSH_RELEASES_DIR/bosh-lite" ]; then
 		git clone $BOSH_LITE_REPO $BOSH_RELEASES_DIR/bosh-lite >> $LOG_FILE 2>&1
-	elif [[ $3 == "-f" ]]; then
+	fi
+
+	if [[ $3 == "-f" ]]; then
 		$EXECUTION_DIR/perform_cleanup.sh
 		rm -rf $BOSH_RELEASES_DIR/bosh-lite/$STEM_CELL_TO_INSTALL
 	fi
@@ -163,22 +161,8 @@ download_stemcell() {
 		echo "###### Downloading... warden ######"
 		wget --progress=bar:force $STEM_CELL_URL -o $LOG_FILE 2>&1
 	else
-		echo "###### Warden Stemcell already exists ######"	
+		echo "###### Warden Stemcell already exists ######"
 	fi
-}
-
-generate_bundles() {
-	switch_to_bosh_lite
-
-	set -e
-	echo "###### Bundle bosh-lite ######"
-	bundle &> $LOG_FILE 2>&1
-
-	switch_to_cf_release
-
-	set -e
-	echo "###### Bundle cf-release ######"
-	bundle &> $LOG_FILE 2>&1
 }
 
 vagrant_up() {
@@ -192,7 +176,7 @@ vagrant_up() {
 			vagrant plugin uninstall vagrant-vmware-fusion
 		fi
 
-		vagrant up >> $LOG_FILE 2>&1
+		vagrant up local --provider=virtualbox >> $LOG_FILE 2>&1
 	else
 		if [ $PLUGIN_INSTALLED == true ]; then
 			logInfo "Vagrant Plugin already installed"
@@ -201,7 +185,7 @@ vagrant_up() {
 			vagrant plugin license vagrant-vmware-fusion $EXECUTION_DIR/license.lic >> $LOG_FILE 2>&1
 		fi
 
-		vagrant up --provider vmware_fusion >> $LOG_FILE 2>&1
+		vagrant up local --provider=vmware_fusion >> $LOG_FILE 2>&1
 	fi
 
 	echo "###### Target BOSH to BOSH director ######"
@@ -211,7 +195,7 @@ vagrant_up() {
 	bosh login $BOSH_USER $BOSH_PASSWORD
 
 	echo "###### Set the routing tables ######"
-	echo $PASSWORD | sudo -S scripts/add-route >> $LOG_FILE 2>&1
+	echo $PASSWORD | sudo -S bin/add-route >> $LOG_FILE 2>&1
 }
 
 begin_deployment() {
@@ -233,7 +217,7 @@ begin_deployment() {
 
 	set -e
 	echo "###### Generate a manifest at manifests/cf-manifest.yml ######"
-	./scripts/make_manifest_spiff &> $LOG_FILE 2>&1
+	./bin/make_manifest_spiff &> $LOG_FILE 2>&1
 
 	echo "###### Deploy the manifest manifests/cf-manifest.yml ######"
 	bosh deployment manifests/cf-manifest.yml &> $LOG_FILE 2>&1
