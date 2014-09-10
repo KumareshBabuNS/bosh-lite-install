@@ -111,7 +111,7 @@ update_repos() {
 		git clone $BOSH_LITE_REPO $BOSH_RELEASES_DIR/bosh-lite >> $LOG_FILE 2>&1
 	fi
 
-	if [[ $3 == "-f" ]]; then
+	if [[ $3 -eq '-f' ]]; then
 		$EXECUTION_DIR/perform_cleanup.sh
 		rm -rf $BOSH_RELEASES_DIR/bosh-lite/$STEM_CELL_TO_INSTALL
 	fi
@@ -176,7 +176,7 @@ vagrant_up() {
 			vagrant plugin uninstall vagrant-vmware-fusion
 		fi
 
-		vagrant up local --provider=virtualbox >> $LOG_FILE 2>&1
+		vagrant up --provider=virtualbox >> $LOG_FILE 2>&1
 	else
 		if [ $PLUGIN_INSTALLED == true ]; then
 			logInfo "Vagrant Plugin already installed"
@@ -185,7 +185,7 @@ vagrant_up() {
 			vagrant plugin license vagrant-vmware-fusion $EXECUTION_DIR/license.lic >> $LOG_FILE 2>&1
 		fi
 
-		vagrant up local --provider=vmware_fusion >> $LOG_FILE 2>&1
+		vagrant up --provider=vmware_fusion >> $LOG_FILE 2>&1
 	fi
 
 	echo "###### Target BOSH to BOSH director ######"
