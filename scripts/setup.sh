@@ -111,7 +111,7 @@ update_repos() {
 		git clone $BOSH_LITE_REPO $BOSH_RELEASES_DIR/bosh-lite >> $LOG_FILE 2>&1
 	fi
 
-	if [[ $3 -eq '-f' ]]; then
+	if [[ "$3" -eq "-f" ]]; then
 		$EXECUTION_DIR/perform_cleanup.sh
 		rm -rf $BOSH_RELEASES_DIR/bosh-lite/$STEM_CELL_TO_INSTALL
 	fi
