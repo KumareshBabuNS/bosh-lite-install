@@ -71,7 +71,13 @@ install_required_tools() {
 	$EXECUTION_DIR/brew_install.sh
 
 	set +e
-	$EXECUTION_DIR/ruby_install.sh
+#	$EXECUTION_DIR/ruby_install.sh
+
+	INSTALLED_BOSH_CLI=`which bosh`
+	if [ -z $INSTALLED_BOSH_CLI ]; then
+		echo "###### Installing BOSH CLI ######"
+		gem install bosh_cli >> $LOG_FILE 2>&1
+	fi
 
 	INSTALLED_WGET=`which wget`
 	if [ -z "$INSTALLED_WGET" ]; then
