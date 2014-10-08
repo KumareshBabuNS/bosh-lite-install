@@ -23,8 +23,8 @@ export AWS_STEM_CELL_URL=http://bosh-jenkins-artifacts.s3.amazonaws.com/bosh-ste
 export STEM_CELL_TO_INSTALL=latest-bosh-stemcell-warden.tgz
 export STEM_CELL_URL=$AWS_STEM_CELL_URL/$STEM_CELL_TO_INSTALL
 
-export VAGRANT_VERSION=1.6.2
-export RUBY_VERSION=2.1.1
+export VAGRANT_VERSION=1.6.5
+export RUBY_VERSION=2.1.2
 
 export HOMEBREW_DOWNLOAD_URL=https://raw.github.com/Homebrew/homebrew/go/install
 
@@ -111,7 +111,7 @@ update_repos() {
 		git clone $BOSH_LITE_REPO $BOSH_RELEASES_DIR/bosh-lite >> $LOG_FILE 2>&1
 	fi
 
-	if [[ "$3" -eq "-f" ]]; then
+	if [[ "$FORCE_DELETE" = "-f" ]]; then
 		$EXECUTION_DIR/perform_cleanup.sh
 		rm -rf $BOSH_RELEASES_DIR/bosh-lite/$STEM_CELL_TO_INSTALL
 	fi
@@ -131,6 +131,7 @@ update_repos() {
 	set -e
 	echo "###### Update cf-release to sync the sub-modules ######"
 	./update &> $LOG_FILE
+	
 }
 
 export_cf_release() {
@@ -264,6 +265,7 @@ fi
 
 export PROVIDER=$1
 export BOSH_RELEASES_DIR=$2
+export FORCE_DELETE=$3
 export OS=`uname`
 
 execute
