@@ -26,6 +26,8 @@ export STEM_CELL_URL=$AWS_STEM_CELL_URL/$STEM_CELL_TO_INSTALL
 export VAGRANT_VERSION=1.6.5
 export RUBY_VERSION=2.1.2
 
+export RVM_DOWNLOAD_URL=https://get.rvm.io
+
 export HOMEBREW_DOWNLOAD_URL=https://raw.github.com/Homebrew/homebrew/go/install
 
 export LINUXBREW_GIT_REPO=https://github.com/Homebrew/linuxbrew.git
@@ -70,7 +72,7 @@ install_required_tools() {
 
 	$EXECUTION_DIR/brew_install.sh
 
-	set +e
+	set -e
 	$EXECUTION_DIR/ruby_install.sh
 
 	INSTALLED_WGET=`which wget`
@@ -131,7 +133,7 @@ update_repos() {
 	set -e
 	echo "###### Update cf-release to sync the sub-modules ######"
 	./update &> $LOG_FILE
-	
+
 }
 
 export_cf_release() {
