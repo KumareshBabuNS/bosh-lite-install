@@ -1,4 +1,4 @@
-**NOTE: Supports Diego**
+**Now Supports Diego**
 
 Scripts to install bosh-lite on your local machine
 
@@ -46,7 +46,7 @@ Logs are located in the same directory -> setup.log
 This is work in progress! Enjoy!!
 
 What happens in the script:
-* Git pull of bosh-lite, cf-release and/or digo-release
+* Git pull of bosh-lite, cf-release and/or diego-release
 * Installs homebrew if its missing
 * Installs rvm, ruby if its missing
 * Start the VM with the ubuntu box that's packaged with BOSH 
