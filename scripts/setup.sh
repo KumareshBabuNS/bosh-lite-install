@@ -17,7 +17,7 @@ export BOSH_PASSWORD=admin
 
 export BOSH_LITE_REPO=https://github.com/cloudfoundry/bosh-lite.git
 export CF_RELEASE_REPO=https://github.com/cloudfoundry/cf-release.git
-export CF_ACCEPTANCE_TESTS_REPO=https://github.com/cloudfoundry/cf-acceptance-tests.git
+export DIEGO_RELEASE=https://github.com/cloudfoundry-incubator/diego-release.git
 
 export AWS_STEM_CELL_URL=http://bosh-jenkins-artifacts.s3.amazonaws.com/bosh-stemcell/warden
 export STEM_CELL_TO_INSTALL=latest-bosh-stemcell-warden.tgz
@@ -41,10 +41,23 @@ execute() {
 	update_repos
 	export_cf_release
 	download_stemcell
-	vagrant_up
-	begin_deployment
+	
+	if [ $DIEGO ]; then
+		generate_diego_release
+	fi
+	
+	vagrant_up	
+	begin_cf_deployment
 	setup_dev_environment
 }
+
+execute1() {
+	if [ $DIEGO ]; then
+		generate_diego_release
+	fi
+	
+}
+
 
 validate_input() {
 	set -e
@@ -69,10 +82,9 @@ prompt_password() {
 
 install_required_tools() {
 	set -e
-
 	$EXECUTION_DIR/brew_install.sh
 
-	set -e
+	set +e
 	$EXECUTION_DIR/ruby_install.sh
 
 	INSTALLED_WGET=`which wget`
@@ -87,7 +99,12 @@ install_required_tools() {
 		brew tap xoebus/homebrew-cloudfoundry &> $LOG_FILE 2>&1
 		brew install spiff &> $LOG_FILE 2>&1
 	fi
-
+	
+	INSTALLED_GO=`which go`
+	if [ -z "$INSTALLED_GO" ]; then
+		go get github.com/cloudfoundry-incubator/spiff &> $LOG_FILE 2>&1
+	fi	
+	
 	BOSH_INSTALLED=`which bosh`
 	if [ -z "$BOSH_INSTALLED" ]; then
 		logError "Bosh command not found, please fire rvm gemset use bosh-lite"
@@ -109,17 +126,28 @@ install_required_tools() {
 update_repos() {
 	set -e
 	echo "###### Clone Required Git Repositories ######"
-	if [ ! -d "$BOSH_RELEASES_DIR/bosh-lite" ]; then
-		git clone $BOSH_LITE_REPO $BOSH_RELEASES_DIR/bosh-lite >> $LOG_FILE 2>&1
+	if [ ! -d "$BOSH_LITE_DIR" ]; then
+		git clone $BOSH_LITE_REPO $BOSH_LITE_DIR >> $LOG_FILE 2>&1
 	fi
 
 	if [[ "$FORCE_DELETE" = "-f" ]]; then
 		$EXECUTION_DIR/perform_cleanup.sh
-		rm -rf $BOSH_RELEASES_DIR/bosh-lite/$STEM_CELL_TO_INSTALL
+		rm -rf $BOSH_LITE_DIR/$STEM_CELL_TO_INSTALL
 	fi
 
-	if [ ! -d "$BOSH_RELEASES_DIR/cf-release" ]; then
-		git clone $CF_RELEASE_REPO $BOSH_RELEASES_DIR/cf-release >> $LOG_FILE 2>&1
+	if [ ! -d "$CF_RELEASE_DIR" ]; then
+		git clone $CF_RELEASE_REPO $CF_RELEASE_DIR >> $LOG_FILE 2>&1
+	fi
+	
+	if [ $DIEGO ]; then
+		if [ ! -d "$BOSH_RELEASES_DIR/diego-release" ]; then
+			git clone $DIEGO_RELEASE $BOSH_RELEASES_DIR/diego-release >> $LOG_FILE 2>&1
+		fi
+		
+		set -e
+		switch_to_diego_release	
+		echo "###### Update diego-release to sync the sub-modules ######"
+		./scripts/update &> $LOG_FILE
 	fi
 
 	switch_to_bosh_lite
@@ -139,7 +167,7 @@ update_repos() {
 export_cf_release() {
 	set -e
 
-	export CF_LATEST_RELEASE_VERSION=`tail -2 $BOSH_RELEASES_DIR/cf-release/releases/index.yml | head -1 | cut -d':' -f2 | cut -d' ' -f2`
+	export CF_LATEST_RELEASE_VERSION=`tail -2 $CF_RELEASE_DIR/releases/index.yml | head -1 | cut -d':' -f2 | cut -d' ' -f2`
 
 	if [[ -n ${CF_LATEST_RELEASE_VERSION//[0-9]/} ]]; then
 		export CF_LATEST_RELEASE_VERSION=`echo $CF_LATEST_RELEASE_VERSION | tr -d "'"`
@@ -150,7 +178,7 @@ export_cf_release() {
 	logInfo "Deploy CF release $CF_RELEASE"
 
 	echo "###### Validate the entered cf version ######"
-	if [ ! -f $BOSH_RELEASES_DIR/cf-release/releases/$CF_RELEASE ]; then
+	if [ ! -f $CF_RELEASE_DIR/releases/$CF_RELEASE ]; then
 		logError "Invalid CF version selected. Please correct and try again"
 	fi
 }
@@ -201,10 +229,10 @@ vagrant_up() {
 	echo $PASSWORD | sudo -S bin/add-route >> $LOG_FILE 2>&1
 }
 
-begin_deployment() {
+begin_cf_deployment() {
 	set +e
 	echo "###### Upload stemcell ######"
-	bosh upload stemcell --skip-if-exists $BOSH_RELEASES_DIR/bosh-lite/$STEM_CELL_TO_INSTALL >> $LOG_FILE 2>&1
+	bosh upload stemcell --skip-if-exists $BOSH_LITE_DIR/$STEM_CELL_TO_INSTALL >> $LOG_FILE 2>&1
 
 	set -e
 	STEM_CELL_NAME=$( bosh stemcells | grep -o "bosh-warden-[^[:space:]]*" )
@@ -218,22 +246,48 @@ begin_deployment() {
 
 	switch_to_bosh_lite
 
-	set -e
-	echo "###### Generate a manifest at manifests/cf-manifest.yml ######"
-	./bin/make_manifest_spiff &> $LOG_FILE 2>&1
+	if [ $DIEGO ]; then
+		create_deployment_dir
+		generate_diego_deployment_stub
+		generate_diego_deployment_manifest
+		generate_diego_release
+		echo "###### Deploy the manifest for diego cf.yml ######"
+		bosh deployment $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
+	else
+		set -e
+		echo "###### Generate a manifest at manifests/cf-manifest.yml ######"
+		./bin/make_manifest_spiff &> $LOG_FILE 2>&1
 
-	echo "###### Deploy the manifest manifests/cf-manifest.yml ######"
-	bosh deployment manifests/cf-manifest.yml &> $LOG_FILE 2>&1
-
+		echo "###### Deploy the manifest manifests/cf-manifest.yml ######"
+		bosh deployment manifests/cf-manifest.yml &> $LOG_FILE 2>&1
+	fi	
+	
 	set +e
 	logCustom 9 "###### Deploy CF to BOSH-LITE (THIS WOULD TAKE SOME TIME) ######"
 	echo "yes" | bosh deploy &> $LOG_FILE 2>&1
+	
+	if [ $DIEGO ]; then
+		deploy_diego_release
+	fi
 
 	echo "###### Executing BOSH VMS to ensure all VMS are running ######"
 	BOSH_VMS_INSTALLED_SUCCESSFULLY=$( bosh vms | grep -o "failing" )
 	if [ ! -z "$BOSH_VMS_INSTALLED_SUCCESSFULLY" ]; then
 		logError "Not all BOSH VMs are up. Please check logs for more info"
 	fi
+}
+
+deploy_diego_release() {
+	switch_to_diego_release
+		
+	set +e
+	logCustom 9 "###### Upload diego-release ######"
+	bosh deployment $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml &> $LOG_FILE 2>&1
+	bosh -n upload release &> $LOG_FILE 2>&1
+	
+	set +e
+	logCustom 9 "###### Deploy Diego to BOSH-LITE (THIS WOULD TAKE SOME TIME) ######"
+	echo "yes" | bosh -n deploy &> $LOG_FILE 2>&1
 }
 
 setup_dev_environment() {
@@ -243,20 +297,56 @@ setup_dev_environment() {
 switch_to_bosh_lite() {
 	set +e
 	echo "###### Switching to bosh-lite ######"
-	cd $BOSH_RELEASES_DIR/bosh-lite
+	cd $BOSH_LITE_DIR
 }
 
 switch_to_cf_release() {
 	set +e
 	echo "###### Switching to cf-release ######"
-	cd $BOSH_RELEASES_DIR/cf-release
+	cd $CF_RELEASE_DIR
+}
+
+switch_to_diego_release() {
+	set +e
+	echo "###### Switching to diego-release ######"
+	cd $DIEGO_RELEASE_DIR
+}
+
+create_deployment_dir() {
+	set +e
+	echo "###### Create deployment directory ######"
+	mkdir -p $BOSH_RELEASES_DIR/deployments/bosh-lite
+}
+
+generate_diego_deployment_stub() {
+	set +e
+	echo "###### Generating Diego deployment stub ######"
+	switch_to_diego_release
+	./scripts/print-director-stub > $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml
+}
+
+generate_diego_deployment_manifest() {
+	set -e
+	echo "###### Generating cf release manifest ######"
+	switch_to_cf_release
+	./generate_deployment_manifest warden $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/templates/enable_diego_in_cc.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
+	switch_to_diego_release
+	./scripts/generate-deployment-manifest bosh-lite ../cf-release $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml
+}
+
+generate_diego_release() {
+	switch_to_diego_release
+	set -e
+	echo "###### Create Diego Release ######"
+	bosh create release --name diego --force &> $LOG_FILE 2>&1
 }
 
 echo "######  Install Open Source CloudFoundry ######"
 if [ $# -lt 2 ]; then
-	echo "Usage: ./setup.sh <provider> <install-dir>"
+	echo "Usage: ./setup.sh <provider> <install-dir> <options>"
 	printf "\t %s \t\t %s \n\t\t\t\t %s \n" "provider:" "Enter 1 for Virtual Box" "Enter 2 for VMWare Fusion"
 	printf "\t %s \t\t %s \n" "install-dir:" "Specify the install directory"
+	printf "\t %s \t %s \n" "diego-release:" "Specify true to install diego"
 	printf "\t %s \t\t\t %s \n" "-f" "Force remove old installation and install fresh"
 	exit 1
 fi
@@ -266,9 +356,21 @@ if [ ! -d $2 ]; then
 fi
 
 export PROVIDER=$1
+
 export BOSH_RELEASES_DIR=$2
-export FORCE_DELETE=$3
+if [ $3 == true ]; then
+	export DIEGO=$3
+fi	
+
+if [[ $3 = "-f" || $4 = "-f" ]]; then
+	export FORCE_DELETE="-f"
+fi
+
 export OS=`uname`
+
+export BOSH_LITE_DIR=$BOSH_RELEASES_DIR/bosh-lite
+export CF_RELEASE_DIR=$BOSH_RELEASES_DIR/cf-release
+export DIEGO_RELEASE_DIR=$BOSH_RELEASES_DIR/diego-release
 
 execute
 

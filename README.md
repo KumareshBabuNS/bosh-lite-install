@@ -1,3 +1,5 @@
+**NOTE: Supports Diego**
+
 Scripts to install bosh-lite on your local machine
 
 Clone this repository -> **git clone https://github.com/pivotalservices/bosh-lite-install.git bosh-lite-install**.
@@ -26,10 +28,11 @@ Install Open Source CloudFoundry
 
 ```
 ######  Install Open Source CloudFoundry ######
-Usage: ./setup.sh <provider> <install-dir>
+Usage: ./setup.sh <provider> <install-dir> <options>
 	 provider: 		         Enter 1 for Virtual Box 
 							 Enter 2 for VMWare Fusion 
-	 install-dir: 		     Specify the install directory 
+	 install-dir: 		     Specify the install directory
+	 diego-release: 	     Specify true to install diego
 	 -f 			         Force remove old installation and install fresh
 ```
 
@@ -43,7 +46,7 @@ Logs are located in the same directory -> setup.log
 This is work in progress! Enjoy!!
 
 What happens in the script:
-* Git pull of bosh-lite and cf-release
+* Git pull of bosh-lite, cf-release and/or digo-release
 * Installs homebrew if its missing
 * Installs rvm, ruby if its missing
 * Start the VM with the ubuntu box that's packaged with BOSH 
