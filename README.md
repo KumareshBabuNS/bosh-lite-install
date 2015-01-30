@@ -4,7 +4,7 @@ Scripts to install bosh-lite on your local machine
 
 Clone this repository -> **git clone https://github.com/pivotalservices/bosh-lite-install.git bosh-lite-install**.
 
-Once done, copy all the shell (.sh) files from scripts folder to any directory of your choice. 
+Once done, copy all the shell (.sh) files from scripts folder to any directory of your choice.
 
 Ensure the script has executable permissions. If not -> **chmod +x setup.sh**
 
@@ -29,10 +29,9 @@ Install Open Source CloudFoundry
 ```
 ######  Install Open Source CloudFoundry ######
 Usage: ./setup.sh <provider> <install-dir> <options>
-	 provider: 		         Enter 1 for Virtual Box 
-							 Enter 2 for VMWare Fusion 
+	 provider: 		         Enter 1 for Virtual Box
+							 Enter 2 for VMWare Fusion
 	 install-dir: 		     Specify the install directory
-	 diego-release: 	     Specify true to install diego
 	 -f 			         Force remove old installation and install fresh
 ```
 
@@ -40,6 +39,8 @@ ex: ./setup.sh 1 ~/Documents/cloudfoundry
 Note: Please create this directory before running the script.
 
 Enter the password when prompted.
+
+** NOTE: After CF install completes, you will be prompted to install diego, please enter Y/N to complete diego release **
 
 Logs are located in the same directory -> setup.log
 
@@ -49,7 +50,7 @@ What happens in the script:
 * Git pull of bosh-lite, cf-release and/or diego-release
 * Installs homebrew if its missing
 * Installs rvm, ruby if its missing
-* Start the VM with the ubuntu box that's packaged with BOSH 
+* Start the VM with the ubuntu box that's packaged with BOSH
 * Latest stemcell is installed into the VM
 * Release build is installed into the VM
 * Finally cf release is deployed into the VM

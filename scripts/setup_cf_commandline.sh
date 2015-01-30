@@ -16,8 +16,8 @@ if [ -z "$GO_CF_VERSION" ]; then
   brew install cloudfoundry-cli >> $LOG_FILE 2>&1
 fi
 
-set -e
 echo "###### Setting up cf (Create org, spaces) ######"
+set -e
 cf api --skip-ssl-validation $CLOUD_CONTROLLER_URL >> $LOG_FILE 2>&1
 cf auth $CF_USER $CF_PASSWORD >> $LOG_FILE 2>&1
 cf create-org $ORG_NAME >> $LOG_FILE 2>&1
