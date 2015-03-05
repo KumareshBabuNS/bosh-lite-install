@@ -319,7 +319,7 @@ generate_diego_deployment_manifest() {
 	set -e
 	echo "###### Generating cf release manifest ######"
 	switch_to_cf_release
-	./generate_deployment_manifest warden $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/templates/enable_diego_in_cc.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
+	./generate_deployment_manifest warden $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/templates/enable_diego_docker_in_cc.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
 	switch_to_diego_release
 	./scripts/generate-deployment-manifest bosh-lite ../cf-release $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml
 }
