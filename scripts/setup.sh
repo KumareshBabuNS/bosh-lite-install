@@ -23,8 +23,8 @@ export AWS_STEM_CELL_URL=http://bosh-jenkins-artifacts.s3.amazonaws.com/bosh-ste
 export STEM_CELL_TO_INSTALL=latest-bosh-stemcell-warden.tgz
 export STEM_CELL_URL=$AWS_STEM_CELL_URL/$STEM_CELL_TO_INSTALL
 
-export VAGRANT_VERSION=1.6.5
-export RUBY_VERSION=2.1.2
+export VAGRANT_VERSION=1.7.2
+export BOSH_RUBY_VERSION=2.2.2
 
 export RVM_DOWNLOAD_URL=https://get.rvm.io
 
@@ -32,7 +32,7 @@ export HOMEBREW_DOWNLOAD_URL=https://raw.github.com/Homebrew/homebrew/go/install
 
 . logMessages.sh
 
-execute() {
+execute_cf_deployment() {
 	validate_input
 	prompt_password
 	install_required_tools
@@ -44,13 +44,6 @@ execute() {
 
 	echo "Done installing $CF_RELEASE"
 	echo
-
-	read -p "Do you want to install diego release? Enter Y/N (N): " DIEGO
-	echo
-
-	install_diego $DIEGO
-
-	setup_dev_environment
 }
 
 validate_input() {
@@ -127,7 +120,7 @@ update_repos() {
 
 	if [[ "$FORCE_DELETE" = "-f" ]]; then
 		$EXECUTION_DIR/perform_cleanup.sh
-		rm -rf $BOSH_LITE_DIR/$STEM_CELL_TO_INSTALL
+		#rm -rf $BOSH_LITE_DIR/$STEM_CELL_TO_INSTALL
 	fi
 
 	if [ ! -d "$CF_RELEASE_DIR" ]; then
@@ -217,6 +210,8 @@ vagrant_up() {
 		else
 			vagrant plugin install vagrant-vmware-fusion >> $LOG_FILE 2>&1
 			vagrant plugin license vagrant-vmware-fusion $EXECUTION_DIR/license.lic >> $LOG_FILE 2>&1
+			
+			vagrant plugin install vagrant-multiprovider-snap >> $LOG_FILE 2>&1
 		fi
 
 		vagrant up --provider=vmware_fusion >> $LOG_FILE 2>&1
@@ -230,6 +225,11 @@ vagrant_up() {
 
 	echo "###### Set the routing tables ######"
 	echo $PASSWORD | sudo -S bin/add-route >> $LOG_FILE 2>&1
+	
+	read -s -p "Did you update the VM? (y/n): " OPTION
+	if [[ $OPTION = "N" || $OPTION = "n" ]]; then
+		logError "Please update the bosh-lite upload settings"
+	fi
 }
 
 begin_cf_deployment() {
@@ -319,9 +319,15 @@ generate_diego_deployment_manifest() {
 	set -e
 	echo "###### Generating cf release manifest ######"
 	switch_to_cf_release
-	./generate_deployment_manifest warden $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/templates/enable_diego_docker_in_cc.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
+	./generate_deployment_manifest $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_docker_in_cc.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_consul_with_cf.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
 	switch_to_diego_release
-	./scripts/generate-deployment-manifest bosh-lite ../cf-release $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml
+	./scripts/generate-deployment-manifest \ 
+	    $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml \
+	    manifest-generation/bosh-lite-stubs/property-overrides.yml \
+    	manifest-generation/bosh-lite-stubs/instance-count-overrides.yml \
+	    manifest-generation/bosh-lite-stubs/persistent-disk-overrides.yml \
+    	manifest-generation/bosh-lite-stubs/iaas-settings.yml \
+	    manifest-generation/bosh-lite-stubs/additional-jobs.yml $BOSH_RELEASES_DIR/deployments/bosh-lite  > $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml
 }
 
 generate_diego_release() {
@@ -342,8 +348,11 @@ sync_diego_repo() {
 	./scripts/update &> $LOG_FILE
 }
 
-install_diego() {
-	if [[ $1 = "Y" || $1 = "y" ]]; then
+execute_diego_deployment() {
+	read -p "Do you want to install diego release? Enter Y/N (N): " DIEGO
+	echo
+
+	if [[ $DIEGO = "Y" || $DIEGO = "y" ]]; then
 		echo "###### Installing Diego ######"
 		sync_diego_repo
 		export_diego_release
@@ -385,7 +394,13 @@ export BOSH_LITE_DIR=$BOSH_RELEASES_DIR/bosh-lite
 export CF_RELEASE_DIR=$BOSH_RELEASES_DIR/cf-release
 export DIEGO_RELEASE_DIR=$BOSH_RELEASES_DIR/diego-release
 
-execute
+execute_cf_deployment
+execute_diego_deployment
+
+setup_dev_environment
+
+cd $BOSH_LITE_DIR
+vagrant snap take --name=original
 
 echo ">>>>>>>>>> End time: $(date) <<<<<<<<<<<<"
 echo ">>>>>>>>>> End time: $(date) <<<<<<<<<<<<" >> $LOG_FILE

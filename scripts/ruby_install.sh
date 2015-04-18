@@ -30,6 +30,7 @@ installRuby () {
 	if [ -z "$RUBY_VERSION_INSTALLED" ]; then
 		logCustom 9 "Ruby not found. I knew you would never read the instructions. I have to install this for you now! Phew!!"
 		rvm install $1 >> $LOG_FILE 2>&1
+		rvm --default use $BOSH_RUBY_VERSION >> $LOG_FILE 2>&1
 
 		if [ $? -gt 0 ]; then
 			logError "Unable to Install ruby"
@@ -56,9 +57,9 @@ if [ -z "$WHICH_RVM" ]; then
 	exit 1
 fi
 
-installRuby $RUBY_VERSION
+installRuby $BOSH_RUBY_VERSION
 
 set +e
-echo "###### Using Ruby $RUBY_VERSION ######"
-rvm --default use $RUBY_VERSION >> $LOG_FILE 2>&1
-logSuccess "Successfully set ruby to $RUBY_VERSION."
+echo "###### Using Ruby $BOSH_RUBY_VERSION ######"
+rvm --default use $BOSH_RUBY_VERSION >> $LOG_FILE 2>&1
+logSuccess "Successfully set ruby to $BOSH_RUBY_VERSION."
