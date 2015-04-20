@@ -319,16 +319,12 @@ generate_diego_deployment_stub() {
 generate_diego_deployment_manifest() {
 	set -e
 	echo "###### Generating cf release manifest ######"
+
 	switch_to_cf_release
-	./generate_deployment_manifest $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_docker_in_cc.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_consul_with_cf.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
+	./generate_deployment_manifest warden $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_docker_in_cc.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_consul_with_cf.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
+
 	switch_to_diego_release
-	./scripts/generate-deployment-manifest \ 
-	    $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml \
-	    manifest-generation/bosh-lite-stubs/property-overrides.yml \
-    	manifest-generation/bosh-lite-stubs/instance-count-overrides.yml \
-	    manifest-generation/bosh-lite-stubs/persistent-disk-overrides.yml \
-    	manifest-generation/bosh-lite-stubs/iaas-settings.yml \
-	    manifest-generation/bosh-lite-stubs/additional-jobs.yml $BOSH_RELEASES_DIR/deployments/bosh-lite  > $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml
+	./scripts/generate-deployment-manifest $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml manifest-generation/bosh-lite-stubs/property-overrides.yml manifest-generation/bosh-lite-stubs/instance-count-overrides.yml manifest-generation/bosh-lite-stubs/persistent-disk-overrides.yml manifest-generation/bosh-lite-stubs/iaas-settings.yml manifest-generation/bosh-lite-stubs/additional-jobs.yml $BOSH_RELEASES_DIR/deployments/bosh-lite > $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml
 }
 
 generate_diego_release() {
@@ -395,7 +391,7 @@ export BOSH_LITE_DIR=$BOSH_RELEASES_DIR/bosh-lite
 export CF_RELEASE_DIR=$BOSH_RELEASES_DIR/cf-release
 export DIEGO_RELEASE_DIR=$BOSH_RELEASES_DIR/diego-release
 
-execute_cf_deployment
+#execute_cf_deployment
 execute_diego_deployment
 
 setup_dev_environment
