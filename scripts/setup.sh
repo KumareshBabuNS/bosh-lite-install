@@ -226,7 +226,7 @@ vagrant_up() {
 	echo "###### Set the routing tables ######"
 	echo $PASSWORD | sudo -S bin/add-route >> $LOG_FILE 2>&1
 	
-	read -s "Did you update the VM with the settings mentioned at https://groups.google.com/a/cloudfoundry.org/forum/#!msg/bosh-users/MjiFAdpyimQ/VeOCpG9SsHQJ? (y/n): " OPTION
+	read -p "Did you update the VM with the settings mentioned at https://groups.google.com/a/cloudfoundry.org/forum/#!msg/bosh-users/MjiFAdpyimQ/VeOCpG9SsHQJ? (y/n): " OPTION
 	if [[ $OPTION = "N" || $OPTION = "n" || $OPTION = "" ]]; then
 		logError "Please update the bosh-lite upload settings"
 	fi
@@ -391,7 +391,7 @@ export BOSH_LITE_DIR=$BOSH_RELEASES_DIR/bosh-lite
 export CF_RELEASE_DIR=$BOSH_RELEASES_DIR/cf-release
 export DIEGO_RELEASE_DIR=$BOSH_RELEASES_DIR/diego-release
 
-#execute_cf_deployment
+execute_cf_deployment
 execute_diego_deployment
 
 setup_dev_environment
