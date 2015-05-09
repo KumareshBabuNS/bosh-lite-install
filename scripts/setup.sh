@@ -71,7 +71,7 @@ install_required_tools() {
 	set +e
 	$EXECUTION_DIR/ruby_install.sh
 
-	if [[ $OS = "darwin" ]]; then
+	if [[ $OS = "Darwin" ]]; then
 		set -e
 		$EXECUTION_DIR/brew_install.sh
 
@@ -84,7 +84,8 @@ install_required_tools() {
 
 	GO_INSTALLED=`which go`
 	if [ -z "$GO_INSTALLED" ]; then
-		logError "Go command not found, please install go"
+		logInfo "Go command not found, please install go"
+		brew install go >> $LOG_FILE 2>&1
 	fi
 
 
@@ -144,10 +145,14 @@ update_repos() {
 export_cf_release() {
 	set -e
 
-	export CF_LATEST_RELEASE_VERSION=`tail -2 $CF_RELEASE_DIR/releases/index.yml | head -1 | cut -d':' -f2 | cut -d' ' -f2`
+	if [ -z $CF_VERSION_REQUIRED ]; then
+		export CF_LATEST_RELEASE_VERSION=`tail -2 $CF_RELEASE_DIR/releases/index.yml | head -1 | cut -d':' -f2 | cut -d' ' -f2`
 
-	if [[ -n ${CF_LATEST_RELEASE_VERSION//[0-9]/} ]]; then
-		export CF_LATEST_RELEASE_VERSION=`echo $CF_LATEST_RELEASE_VERSION | tr -d "'"`
+		if [[ -n ${CF_LATEST_RELEASE_VERSION//[0-9]/} ]]; then
+			export CF_LATEST_RELEASE_VERSION=`echo $CF_LATEST_RELEASE_VERSION | tr -d "'"`
+		fi
+	else
+		export CF_LATEST_RELEASE_VERSION=$CF_VERSION_REQUIRED
 	fi
 
 	logInfo "Latest version of Cloud Foundry is: $CF_LATEST_RELEASE_VERSION"
@@ -210,7 +215,7 @@ vagrant_up() {
 		else
 			vagrant plugin install vagrant-vmware-fusion >> $LOG_FILE 2>&1
 			vagrant plugin license vagrant-vmware-fusion $EXECUTION_DIR/license.lic >> $LOG_FILE 2>&1
-			
+
 			vagrant plugin install vagrant-multiprovider-snap >> $LOG_FILE 2>&1
 		fi
 
@@ -225,7 +230,7 @@ vagrant_up() {
 
 	echo "###### Set the routing tables ######"
 	echo $PASSWORD | sudo -S bin/add-route >> $LOG_FILE 2>&1
-	
+
 	read -p "Did you update the VM with the settings mentioned at https://groups.google.com/a/cloudfoundry.org/forum/#!msg/bosh-users/MjiFAdpyimQ/VeOCpG9SsHQJ? (y/n): " OPTION
 	if [[ $OPTION = "N" || $OPTION = "n" || $OPTION = "" ]]; then
 		logError "Please update the bosh-lite upload settings"
@@ -371,6 +376,7 @@ if [ $# -lt 2 ]; then
 	printf "\t %s \t\t %s \n\t\t\t\t %s \n" "provider:" "Enter 1 for Virtual Box" "Enter 2 for VMWare Fusion"
 	printf "\t %s \t\t %s \n" "install-dir:" "Specify the install directory"
 	printf "\t %s \t\t\t %s \n" "-f" "Force remove old installation and install fresh"
+	printf "\t %s \t\t\t %s \n" "-v=" "version to install"
 	exit 1
 fi
 
@@ -381,8 +387,16 @@ fi
 export PROVIDER=$1
 export BOSH_RELEASES_DIR=$2
 
-if [[ $3 = "-f" ]]; then
+if [[ $3 = "-f" || $4 = "-f" ]]; then
 	export FORCE_DELETE="-f"
+fi
+
+if [[ $3 == *"-v"* ]]; then
+	export CF_VERSION_REQUIRED=`echo $3 | tr -d '\-v='`
+	echo $CF_VERSION_REQUIRED
+elif [[ $4 == *"-v"* ]]; then
+	export CF_VERSION_REQUIRED=`echo $4 | tr -d '\-v='`
+	echo $CF_VERSION_REQUIRED
 fi
 
 export OS=`uname`
