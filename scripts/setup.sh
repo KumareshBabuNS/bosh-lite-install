@@ -32,20 +32,6 @@ export HOMEBREW_DOWNLOAD_URL=https://raw.github.com/Homebrew/homebrew/go/install
 
 . logMessages.sh
 
-execute_cf_deployment() {
-	validate_input
-	prompt_password
-	install_required_tools
-	update_repos
-	export_cf_release
-	download_stemcell
-	vagrant_up
-	begin_cf_deployment
-
-	echo "Done installing $CF_RELEASE"
-	echo
-}
-
 validate_input() {
 	set -e
 	./validation.sh $PROVIDER
@@ -76,21 +62,21 @@ install_required_tools() {
 		$EXECUTION_DIR/brew_install.sh
 
 		INSTALLED_WGET=`which wget`
-		if [ -z "$INSTALLED_WGET" ]; then
+		if [ -z $INSTALLED_WGET ]; then
 			echo "###### Installing wget ######"
 			brew install wget >> $LOG_FILE 2>&1
 		fi
 	fi
 
 	GO_INSTALLED=`which go`
-	if [ -z "$GO_INSTALLED" ]; then
+	if [ -z $GO_INSTALLED ]; then
 		logInfo "Go command not found, please install go"
 		brew install go >> $LOG_FILE 2>&1
 	fi
 
 
 	BOSH_INSTALLED=`which bosh`
-	if [ -z "$BOSH_INSTALLED" ]; then
+	if [ -z $BOSH_INSTALLED ]; then
 		logError "Bosh command not found, please fire rvm gemset use bosh-lite"
 	fi
 
@@ -107,7 +93,7 @@ install_required_tools() {
 	fi
 
 	INSTALLED_SPIFF=`which spiff`
-	if [ -z "$INSTALLED_SPIFF" ]; then
+	if [ -z $INSTALLED_SPIFF ]; then
 		go get github.com/cloudfoundry-incubator/spiff &> $LOG_FILE 2>&1
 	fi
 }
@@ -115,16 +101,16 @@ install_required_tools() {
 update_repos() {
 	set -e
 	echo "###### Clone Required Git Repositories ######"
-	if [ ! -d "$BOSH_LITE_DIR" ]; then
+	if [ ! -d $BOSH_LITE_DIR ]; then
 		git clone $BOSH_LITE_REPO $BOSH_LITE_DIR >> $LOG_FILE 2>&1
 	fi
 
-	if [[ "$FORCE_DELETE" = "-f" ]]; then
+	if [[ $FORCE_DELETE = "-f" ]]; then
 		$EXECUTION_DIR/perform_cleanup.sh
 		#rm -rf $BOSH_LITE_DIR/$STEM_CELL_TO_INSTALL
 	fi
 
-	if [ ! -d "$CF_RELEASE_DIR" ]; then
+	if [ ! -d $CF_RELEASE_DIR ]; then
 		git clone $CF_RELEASE_REPO $CF_RELEASE_DIR >> $LOG_FILE 2>&1
 	fi
 
@@ -139,7 +125,17 @@ update_repos() {
 	set -e
 	echo "###### Update cf-release to sync the sub-modules ######"
 	./update &> $LOG_FILE
+}
 
+sync_diego_repo() {
+	if [ ! -d "$BOSH_RELEASES_DIR/diego-release" ]; then
+		git clone $DIEGO_RELEASE_REPO $BOSH_RELEASES_DIR/diego-release >> $LOG_FILE 2>&1
+	fi
+
+	set -e
+	switch_to_diego_release
+	echo "###### Update diego-release to sync the sub-modules ######"
+	./scripts/update &> $LOG_FILE
 }
 
 export_cf_release() {
@@ -184,19 +180,6 @@ export_diego_release() {
 	fi
 }
 
-download_stemcell() {
-	switch_to_bosh_lite
-
-	set -e
-	echo "###### Download latest warden stemcell ######"
-	if [ ! -f $STEM_CELL_TO_INSTALL ]; then
-		echo "###### Downloading... warden ######"
-		wget --progress=bar:force $STEM_CELL_URL -o $LOG_FILE 2>&1
-	else
-		echo "###### Warden Stemcell already exists ######"
-	fi
-}
-
 vagrant_up() {
 	switch_to_bosh_lite
 
@@ -231,14 +214,28 @@ vagrant_up() {
 	echo "###### Set the routing tables ######"
 	echo $PASSWORD | sudo -S bin/add-route >> $LOG_FILE 2>&1
 
-	read -p "Did you update the VM with the settings mentioned at https://groups.google.com/a/cloudfoundry.org/forum/#!msg/bosh-users/MjiFAdpyimQ/VeOCpG9SsHQJ? (y/n): " OPTION
-	if [[ $OPTION = "N" || $OPTION = "n" || $OPTION = "" ]]; then
-		logError "Please update the bosh-lite upload settings"
+
+	if [[ "$FORCE_DELETE" = "-f" ]]; then
+		read -p "Did you update the VM with the settings mentioned at https://groups.google.com/a/cloudfoundry.org/forum/#!msg/bosh-users/MjiFAdpyimQ/VeOCpG9SsHQJ? (y/n): " OPTION
+		if [[ $OPTION = "N" || $OPTION = "n" || $OPTION = "" ]]; then
+			logError "Please update the bosh-lite upload settings"
+		fi
+		echo
 	fi
-	echo
 }
 
-begin_cf_deployment() {
+download_and_upload_stemcell() {
+	switch_to_bosh_lite
+
+	set -e
+	echo "###### Download latest warden stemcell ######"
+	if [ ! -f $STEM_CELL_TO_INSTALL ]; then
+		echo "###### Downloading... warden ######"
+		wget --progress=bar:force $STEM_CELL_URL -o $LOG_FILE 2>&1
+	else
+		echo "###### Warden Stemcell already exists ######"
+	fi
+
 	set +e
 	echo "###### Upload stemcell ######"
 	bosh upload stemcell --skip-if-exists $BOSH_LITE_DIR/$STEM_CELL_TO_INSTALL >> $LOG_FILE 2>&1
@@ -246,48 +243,54 @@ begin_cf_deployment() {
 	set -e
 	STEM_CELL_NAME=$( bosh stemcells | grep -o "bosh-warden-[^[:space:]]*" )
 	echo "###### Uploaded stemcell $STEM_CELL_NAME ######"
+}
+
+validate_deployed_release() {
+	set -e
+	export CONTINUE_INSTALL=true
+
+	echo "Deployed version " $1 " and new version " $2
+	if [[ $1 != '' ]]; then
+		if [[ "$1" = "$2" ]]; then
+			logInfo "You're already on the current version, skipping deployment"
+			export CONTINUE_INSTALL=false
+		else
+			logInfo "New CF release available, undeploying the older version"
+			if [[ $3 = true ]]; then
+				bosh -n delete deployment cf-warden-diego --force &> $LOG_FILE 2>&1
+				bosh -n delete release diego --force &> $LOG_FILE 2>&1
+			fi
+			bosh -n delete deployment cf-warden --force &> $LOG_FILE 2>&1
+			bosh -n delete release cf --force &> $LOG_FILE 2>&1
+		fi
+	fi
+}
+
+deploy_release() {
+	cd $1
+
+	set +e
+	logCustom 9 "###### Upload $3-release $DIEGO_RELEASE ######"
+	bosh deployment $2 &> $LOG_FILE 2>&1
+	bosh -n upload release &> $LOG_FILE 2>&1
+
+	set +e
+	logCustom 9 "###### Deploy $3 to BOSH-LITE (THIS WOULD TAKE SOME TIME) ######"
+	bosh -n deploy &> $LOG_FILE 2>&1
+}
+
+begin_cf_deployment() {
+	logInfo "###### Poiting to the cf-release manifest ######"
+	bosh deployment $BOSH_LITE_DIR/manifests/cf-manifest.yml >> $LOG_FILE 2>&1
 
 	switch_to_cf_release
-
 	set +e
 	logCustom 9 "###### Upload cf-release $CF_RELEASE ######"
 	bosh upload release releases/$CF_RELEASE &> $LOG_FILE 2>&1
 
-	switch_to_bosh_lite
-
-	set -e
-	echo "###### Generate a manifest at manifests/cf-manifest.yml ######"
-	./bin/make_manifest_spiff &> $LOG_FILE 2>&1
-
-	echo "###### Deploy the manifest manifests/cf-manifest.yml ######"
-	bosh deployment manifests/cf-manifest.yml &> $LOG_FILE 2>&1
-
 	set +e
-	logCustom 9 "###### Deploy CF to BOSH-LITE (THIS WOULD TAKE SOME TIME) ######"
-	echo "yes" | bosh deploy &> $LOG_FILE 2>&1
-
-	echo "###### Executing BOSH VMS to ensure all VMS are running ######"
-	BOSH_VMS_INSTALLED_SUCCESSFULLY=$( bosh vms | grep -o "failing" )
-	if [ ! -z "$BOSH_VMS_INSTALLED_SUCCESSFULLY" ]; then
-		logError "Not all BOSH VMs are up. Please check logs for more info"
-	fi
-}
-
-deploy_diego_release() {
-	switch_to_diego_release
-
-	set +e
-	logCustom 9 "###### Upload diego-release $DIEGO_RELEASE ######"
-	bosh deployment $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml &> $LOG_FILE 2>&1
-	bosh -n upload release &> $LOG_FILE 2>&1
-
-	set +e
-	logCustom 9 "###### Deploy Diego to BOSH-LITE (THIS WOULD TAKE SOME TIME) ######"
-	echo "yes" | bosh -n deploy &> $LOG_FILE 2>&1
-}
-
-setup_dev_environment() {
-	$EXECUTION_DIR/setup_cf_commandline.sh
+	logCustom 9 "###### Deploy $3 to BOSH-LITE (THIS WOULD TAKE SOME TIME) ######"
+	bosh -n deploy &> $LOG_FILE 2>&1
 }
 
 switch_to_bosh_lite() {
@@ -326,47 +329,97 @@ generate_diego_deployment_manifest() {
 	echo "###### Generating cf release manifest ######"
 
 	switch_to_cf_release
-	./generate_deployment_manifest warden $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_docker_in_cc.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_consul_with_cf.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
+	./generate_deployment_manifest warden $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_docker_in_cc.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_consul_with_cf.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_ssh_in_cc.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/property-overrides.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
 
 	switch_to_diego_release
-	./scripts/generate-deployment-manifest $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml manifest-generation/bosh-lite-stubs/property-overrides.yml manifest-generation/bosh-lite-stubs/instance-count-overrides.yml manifest-generation/bosh-lite-stubs/persistent-disk-overrides.yml manifest-generation/bosh-lite-stubs/iaas-settings.yml manifest-generation/bosh-lite-stubs/additional-jobs.yml $BOSH_RELEASES_DIR/deployments/bosh-lite > $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml
+	./scripts/generate-deployment-manifest $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/property-overrides.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/instance-count-overrides.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/persistent-disk-overrides.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/iaas-settings.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/additional-jobs.yml $BOSH_RELEASES_DIR/deployments/bosh-lite > $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml
 }
 
-generate_diego_release() {
-	switch_to_diego_release
+generate_and_upload_release() {
+	cd $1
 	set -e
-	echo "###### Create Diego Release ######"
-	bosh create release --name diego --force &> $LOG_FILE 2>&1
+	echo "###### Create $2 Release ######"
+	bosh create release --name $2 --force &> $LOG_FILE 2>&1
+	bosh -n upload release >> $LOG_FILE 2>&1
 }
 
-sync_diego_repo() {
-	if [ ! -d "$BOSH_RELEASES_DIR/diego-release" ]; then
-		git clone $DIEGO_RELEASE_REPO $BOSH_RELEASES_DIR/diego-release >> $LOG_FILE 2>&1
+pre_install() {
+	validate_input
+	prompt_password
+	install_required_tools
+	update_repos
+	vagrant_up
+	download_and_upload_stemcell
+}
+
+execute_cf_deployment() {
+	pre_install
+	export_cf_release
+
+	export DEPLOYED_RELEASE=`bosh deployments | grep cf-warden | cut -d '|' -f3 | cut -d '/' -f2 | sort -u`
+
+	validate_deployed_release $DEPLOYED_RELEASE $CF_LATEST_RELEASE_VERSION false
+
+	if [[ $CONTINUE_INSTALL = true ]]; then
+		switch_to_bosh_lite
+		set -e
+		echo "###### Generate a manifest at manifests/cf-manifest.yml ######"
+		./bin/make_manifest_spiff &> $LOG_FILE 2>&1
+
+		begin_cf_deployment
+		echo "Done installing $CF_RELEASE"
+		echo
 	fi
-
-	set -e
-	switch_to_diego_release
-	echo "###### Update diego-release to sync the sub-modules ######"
-	./scripts/update &> $LOG_FILE
 }
 
 execute_diego_deployment() {
-	read -p "Do you want to install diego release? Enter Y/N (N): " DIEGO
-	echo
+	echo "###### Installing Diego ######"
+	pre_install
+	sync_diego_repo
+	export_diego_release
 
-	if [[ $DIEGO = "Y" || $DIEGO = "y" ]]; then
-		echo "###### Installing Diego ######"
-		sync_diego_repo
-		export_diego_release
-		generate_diego_release
+	export DEPLOYED_RELEASE=`bosh deployments | grep diego/ | cut -d '|' -f3 | cut -d '/' -f2 | cut -d '+' -f1 | sort -u`
+
+	validate_deployed_release $DEPLOYED_RELEASE $DIEGO_LATEST_RELEASE_VERSION true
+
+	if [[ $CONTINUE_INSTALL = true ]]; then
 		create_deployment_dir
+
 		generate_diego_deployment_stub
+		bosh deployment $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml &> $LOG_FILE 2>&1
+		switch_to_cf_release
+		generate_and_upload_release $CF_RELEASE_DIR cf
+		deploy_release $CF_RELEASE_DIR $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml CF &> $LOG_FILE 2>&1
+
 		generate_diego_deployment_manifest
-		generate_diego_release
+		bosh deployment $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml &> $LOG_FILE 2>&1
+		generate_and_upload_release $CF_RELEASE_DIR diego
 		echo "###### Deploy the manifest for diego ######"
-		bosh deployment $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
-		deploy_diego_release
+		deploy_release $DIEGO_RELEASE_DIR $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml DIEGO
 		echo "###### Deploy installing $DIEGO_RELEASE ######"
+	fi
+}
+
+setup_dev_environment() {
+	$EXECUTION_DIR/setup_cf_commandline.sh
+}
+
+post_install_activities() {
+	echo "###### Executing BOSH VMS to ensure all VMS are running ######"
+	BOSH_VMS_INSTALLED_SUCCESSFULLY=$( bosh vms | grep -o "failing" )
+	if [ ! -z "$BOSH_VMS_INSTALLED_SUCCESSFULLY" ]; then
+		logError "Not all BOSH VMs are up. Please check logs for more info"
+	fi
+
+	setup_dev_environment
+
+	cd $BOSH_LITE_DIR
+
+	if [[ $CONTINUE_INSTALL = true ]]; then
+		IS_VAGRANT_SNAPSHOT_PLUGIN_AVAILABLE=`vagrant plugin list | grep vagrant-multiprovider-snap`
+		if [ $IS_VAGRANT_SNAPSHOT_PLUGIN_AVAILABLE != '' ]; then
+			vagrant snap take --name=original
+		fi
 	fi
 }
 
@@ -399,19 +452,29 @@ elif [[ $4 == *"-v"* ]]; then
 	echo $CF_VERSION_REQUIRED
 fi
 
+export SELECTION=0
+
+while [[ $SELECTION -ne 1 && $SELECTION -ne 2 ]]; do
+	echo "Select the option:"
+	printf " %s \t %s \n" "1:" "CF-RELEASE"
+	printf " %s \t %s \n" "2:" "DIEGO-RELEASE"
+	read -p "What's it you wish to install? " SELECTION
+	echo
+done
+
 export OS=`uname`
 
 export BOSH_LITE_DIR=$BOSH_RELEASES_DIR/bosh-lite
 export CF_RELEASE_DIR=$BOSH_RELEASES_DIR/cf-release
 export DIEGO_RELEASE_DIR=$BOSH_RELEASES_DIR/diego-release
 
-execute_cf_deployment
-execute_diego_deployment
+if [[ $SELECTION = 1 ]]; then
+	execute_cf_deployment
+elif [[ $SELECTION = 2 ]]; then
+	execute_diego_deployment
+fi
 
-setup_dev_environment
-
-cd $BOSH_LITE_DIR
-vagrant snap take --name=original
+post_install_activities
 
 echo ">>>>>>>>>> End time: $(date) <<<<<<<<<<<<"
 echo ">>>>>>>>>> End time: $(date) <<<<<<<<<<<<" >> $LOG_FILE
