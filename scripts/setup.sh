@@ -58,7 +58,7 @@ install_required_tools() {
 	$EXECUTION_DIR/ruby_install.sh
 
 	if [[ $OS = "Darwin" ]]; then
-		set -e
+		set +e
 		$EXECUTION_DIR/brew_install.sh
 
 		INSTALLED_WGET=`which wget`
@@ -358,7 +358,11 @@ execute_cf_deployment() {
 
 	export DEPLOYED_RELEASE=`bosh deployments | grep cf-warden | cut -d '|' -f3 | cut -d '/' -f2 | sort -u`
 
-	validate_deployed_release $DEPLOYED_RELEASE $CF_LATEST_RELEASE_VERSION false
+	if [[ $DEPLOYED_RELEASE != '' ]]; then
+		validate_deployed_release $DEPLOYED_RELEASE $CF_LATEST_RELEASE_VERSION false
+	else
+		export CONTINUE_INSTALL=true
+	fi
 
 	if [[ $CONTINUE_INSTALL = true ]]; then
 		switch_to_bosh_lite
@@ -380,7 +384,11 @@ execute_diego_deployment() {
 
 	export DEPLOYED_RELEASE=`bosh deployments | grep diego/ | cut -d '|' -f3 | cut -d '/' -f2 | cut -d '+' -f1 | sort -u`
 
-	validate_deployed_release $DEPLOYED_RELEASE $DIEGO_LATEST_RELEASE_VERSION true
+	if [[ $DEPLOYED_RELEASE != '' ]]; then
+		validate_deployed_release $DEPLOYED_RELEASE $DIEGO_LATEST_RELEASE_VERSION true
+	else
+		export CONTINUE_INSTALL=true
+	fi
 
 	if [[ $CONTINUE_INSTALL = true ]]; then
 		create_deployment_dir
@@ -417,7 +425,7 @@ post_install_activities() {
 
 	if [[ $CONTINUE_INSTALL = true ]]; then
 		IS_VAGRANT_SNAPSHOT_PLUGIN_AVAILABLE=`vagrant plugin list | grep vagrant-multiprovider-snap`
-		if [ $IS_VAGRANT_SNAPSHOT_PLUGIN_AVAILABLE != '' ]; then
+		if [[ $IS_VAGRANT_SNAPSHOT_PLUGIN_AVAILABLE != '' ]]; then
 			vagrant snap take --name=original
 		fi
 	fi
