@@ -215,13 +215,13 @@ vagrant_up() {
 	echo $PASSWORD | sudo -S bin/add-route >> $LOG_FILE 2>&1
 
 
-	if [[ "$FORCE_DELETE" = "-f" ]]; then
-		read -p "Did you update the VM with the settings mentioned at https://groups.google.com/a/cloudfoundry.org/forum/#!msg/bosh-users/MjiFAdpyimQ/VeOCpG9SsHQJ? (y/n): " OPTION
-		if [[ $OPTION = "N" || $OPTION = "n" || $OPTION = "" ]]; then
-			logError "Please update the bosh-lite upload settings"
-		fi
-		echo
-	fi
+	#if [[ "$FORCE_DELETE" = "-f" ]]; then
+		#read -p "Did you update the VM with the settings mentioned at https://groups.google.com/a/cloudfoundry.org/forum/#!msg/bosh-users/MjiFAdpyimQ/VeOCpG9SsHQJ? (y/n): " OPTION
+		#if [[ $OPTION = "N" || $OPTION = "n" || $OPTION = "" ]]; then
+		#	logError "Please update the bosh-lite upload settings"
+		#fi
+		#echo
+	#fi
 }
 
 download_and_upload_stemcell() {
