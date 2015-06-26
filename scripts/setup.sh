@@ -164,10 +164,14 @@ export_cf_release() {
 export_diego_release() {
 	set -e
 
-	export DIEGO_LATEST_RELEASE_VERSION=`tail -2 $DIEGO_RELEASE_DIR/releases/index.yml | head -1 | cut -d':' -f2 | cut -d' ' -f2`
+	if [ -z $DIEGO_VERSION_REQUIRED ]; then
+		export DIEGO_LATEST_RELEASE_VERSION=`tail -2 $DIEGO_RELEASE_DIR/releases/index.yml | head -1 | cut -d':' -f2 | cut -d' ' -f2`
 
-	if [[ -n ${DIEGO_LATEST_RELEASE_VERSION//[0-9]/} ]]; then
-		export DIEGO_LATEST_RELEASE_VERSION=`echo $DIEGO_LATEST_RELEASE_VERSION | tr -d "'"`
+		if [[ -n ${DIEGO_LATEST_RELEASE_VERSION//[0-9]/} ]]; then
+			export DIEGO_LATEST_RELEASE_VERSION=`echo $DIEGO_LATEST_RELEASE_VERSION | tr -d "'"`
+		fi
+	else
+		export DIEGO_LATEST_RELEASE_VERSION=$DIEGO_VERSION_REQUIRED
 	fi
 
 	logInfo "Latest version of Diego Cloud Foundry is: $DIEGO_LATEST_RELEASE_VERSION"
@@ -214,14 +218,6 @@ vagrant_up() {
 	echo "###### Set the routing tables ######"
 	echo $PASSWORD | sudo -S bin/add-route >> $LOG_FILE 2>&1
 
-
-	#if [[ "$FORCE_DELETE" = "-f" ]]; then
-		#read -p "Did you update the VM with the settings mentioned at https://groups.google.com/a/cloudfoundry.org/forum/#!msg/bosh-users/MjiFAdpyimQ/VeOCpG9SsHQJ? (y/n): " OPTION
-		#if [[ $OPTION = "N" || $OPTION = "n" || $OPTION = "" ]]; then
-		#	logError "Please update the bosh-lite upload settings"
-		#fi
-		#echo
-	#fi
 }
 
 download_and_upload_stemcell() {
@@ -270,9 +266,7 @@ deploy_release() {
 	cd $1
 
 	set +e
-	logCustom 9 "###### Upload $3-release $DIEGO_RELEASE ######"
 	bosh deployment $2 &> $LOG_FILE 2>&1
-	bosh -n upload release &> $LOG_FILE 2>&1
 
 	set +e
 	logCustom 9 "###### Deploy $3 to BOSH-LITE (THIS WOULD TAKE SOME TIME) ######"
@@ -329,18 +323,30 @@ generate_diego_deployment_manifest() {
 	echo "###### Generating cf release manifest ######"
 
 	switch_to_cf_release
-	./generate_deployment_manifest warden $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_docker_in_cc.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_consul_with_cf.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_ssh_in_cc.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/property-overrides.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
+	./generate_deployment_manifest warden $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_consul_with_cf.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_windows_in_cc.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_ssh_in_cc.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/property-overrides.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
 
 	switch_to_diego_release
 	./scripts/generate-deployment-manifest $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/property-overrides.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/instance-count-overrides.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/persistent-disk-overrides.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/iaas-settings.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/additional-jobs.yml $BOSH_RELEASES_DIR/deployments/bosh-lite > $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml
+
+	export OPTION=0
+
+	while [[ $OPTION -ne 1 ]]; do
+		echo
+		read -p "Have you fixed the diego manifest located at $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml? (y/n): " OPTION
+		if [[ $OPTION = "" || $OPTION = "N" || $OPTION = "n" ]]; then
+			export OPTION=0
+		else
+			export OPTION=1
+		fi
+		echo
+	done
+
 }
 
 generate_and_upload_release() {
 	cd $1
-	set -e
-	echo "###### Create $2 Release ######"
-	bosh create release --name $2 --force &> $LOG_FILE 2>&1
-	bosh -n upload release >> $LOG_FILE 2>&1
+	logCustom 9 "###### Upload $2-release $3 ######"
+	bosh -n upload release releases/$3 >> $LOG_FILE 2>&1
 }
 
 pre_install() {
@@ -380,6 +386,7 @@ execute_diego_deployment() {
 	echo "###### Installing Diego ######"
 	pre_install
 	sync_diego_repo
+	export_cf_release
 	export_diego_release
 
 	export DEPLOYED_RELEASE=`bosh deployments | grep diego/ | cut -d '|' -f3 | cut -d '/' -f2 | cut -d '+' -f1 | sort -u`
@@ -394,17 +401,18 @@ execute_diego_deployment() {
 		create_deployment_dir
 
 		generate_diego_deployment_stub
+		generate_diego_deployment_manifest
 		bosh deployment $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml &> $LOG_FILE 2>&1
 		switch_to_cf_release
-		generate_and_upload_release $CF_RELEASE_DIR cf
-		deploy_release $CF_RELEASE_DIR $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml CF &> $LOG_FILE 2>&1
+		generate_and_upload_release $CF_RELEASE_DIR cf $CF_RELEASE
+		echo "###### Deploy cf release ######"
+		deploy_release $CF_RELEASE_DIR $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml CF
 
-		generate_diego_deployment_manifest
 		bosh deployment $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml &> $LOG_FILE 2>&1
-		generate_and_upload_release $CF_RELEASE_DIR diego
-		echo "###### Deploy the manifest for diego ######"
+		generate_and_upload_release $DIEGO_RELEASE_DIR diego $DIEGO_RELEASE
+		echo "###### Deploy diego release ######"
 		deploy_release $DIEGO_RELEASE_DIR $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml DIEGO
-		echo "###### Deploy installing $DIEGO_RELEASE ######"
+		echo "###### Done Deploying installing $DIEGO_RELEASE ######"
 	fi
 }
 
@@ -420,6 +428,10 @@ post_install_activities() {
 	fi
 
 	setup_dev_environment
+
+	if [[ $SELECTION = 2 ]]; then
+		cf enable-feature-flag diego_docker
+	fi
 
 	cd $BOSH_LITE_DIR
 
@@ -453,11 +465,11 @@ if [[ $3 = "-f" || $4 = "-f" ]]; then
 fi
 
 if [[ $3 == *"-v"* ]]; then
-	export CF_VERSION_REQUIRED=`echo $3 | tr -d '\-v='`
-	echo $CF_VERSION_REQUIRED
+	export RELEASE_VERSION_REQUIRED=`echo $3 | tr -d '\-v='`
+	echo $RELEASE_VERSION_REQUIRED
 elif [[ $4 == *"-v"* ]]; then
-	export CF_VERSION_REQUIRED=`echo $4 | tr -d '\-v='`
-	echo $CF_VERSION_REQUIRED
+	export RELEASE_VERSION_REQUIRED=`echo $4 | tr -d '\-v='`
+	echo $RELEASE_VERSION_REQUIRED
 fi
 
 export SELECTION=0
@@ -477,8 +489,10 @@ export CF_RELEASE_DIR=$BOSH_RELEASES_DIR/cf-release
 export DIEGO_RELEASE_DIR=$BOSH_RELEASES_DIR/diego-release
 
 if [[ $SELECTION = 1 ]]; then
+	export CF_VERSION_REQUIRED=$RELEASE_VERSION_REQUIRED
 	execute_cf_deployment
 elif [[ $SELECTION = 2 ]]; then
+	export DIEGO_VERSION_REQUIRED=$RELEASE_VERSION_REQUIRED
 	execute_diego_deployment
 fi
 
