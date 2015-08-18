@@ -18,6 +18,7 @@ export BOSH_PASSWORD=admin
 export BOSH_LITE_REPO=https://github.com/cloudfoundry/bosh-lite.git
 export CF_RELEASE_REPO=https://github.com/cloudfoundry/cf-release.git
 export DIEGO_RELEASE_REPO=https://github.com/cloudfoundry-incubator/diego-release.git
+export GARDEN_RELEASE_REPO=https://github.com/cloudfoundry-incubator/garden-linux-release.git
 
 export AWS_STEM_CELL_URL=http://bosh-jenkins-artifacts.s3.amazonaws.com/bosh-stemcell/warden
 export STEM_CELL_TO_INSTALL=latest-bosh-stemcell-warden.tgz
@@ -138,6 +139,19 @@ sync_diego_repo() {
 	./scripts/update &> $LOG_FILE
 }
 
+sync_garden_repo() {
+	if [ ! -d "$BOSH_RELEASES_DIR/garden-linux-release" ]; then
+		git clone $GARDEN_RELEASE_REPO $BOSH_RELEASES_DIR/garden-linux-release >> $LOG_FILE 2>&1
+	fi
+
+	set -e
+	switch_to_garden_linux_release
+	echo "###### Update garden-linux-release to sync the sub-modules ######"
+	git pull &> $LOG_FILE
+
+	bundle install &> $LOG_FILE
+}
+
 export_cf_release() {
 	set -e
 
@@ -181,6 +195,29 @@ export_diego_release() {
 	echo "###### Validate the entered diego cf version ######"
 	if [ ! -f $DIEGO_RELEASE_DIR/releases/$DIEGO_RELEASE ]; then
 		logError "Invalid Diego CF version selected. Please correct and try again"
+	fi
+}
+
+export_garden_linux_release() {
+	set -e
+
+	if [ -z $DIEGO_VERSION_REQUIRED ]; then
+		export GARDEN_LINUX_LATEST_RELEASE_VERSION=`tail -2 $GARDEN_RELEASE_DIR/releases/garden-linux/index.yml | head -1 | cut -d':' -f2 | cut -d' ' -f2`
+
+		if [[ -n ${GARDEN_LINUX_LATEST_RELEASE_VERSION//[0-9]/} ]]; then
+			export GARDEN_LINUX_LATEST_RELEASE_VERSION=`echo $GARDEN_LINUX_LATEST_RELEASE_VERSION | tr -d "'"`
+		fi
+	else
+		export GARDEN_LINUX_LATEST_RELEASE_VERSION=$GARDEN_LINUX_LATEST_RELEASE_VERSION
+	fi
+
+	logInfo "Latest version of Garden Linux is: $GARDEN_LINUX_LATEST_RELEASE_VERSION"
+	export GARDEN_LINUX_RELEASE=garden-linux-$GARDEN_LINUX_LATEST_RELEASE_VERSION.yml
+	logInfo "Deploy Garden Linux version $GARDEN_LINUX_RELEASE"
+
+	echo "###### Validate the entered garden linux version ######"
+	if [ ! -f $GARDEN_RELEASE_DIR/releases/garden-linux/$GARDEN_LINUX_RELEASE ]; then
+		logError "Invalid garden linux version selected. Please correct and try again"
 	fi
 }
 
@@ -305,6 +342,12 @@ switch_to_diego_release() {
 	cd $DIEGO_RELEASE_DIR
 }
 
+switch_to_garden_linux_release() {
+	set +e
+	echo "###### Switching to garden-linux-release ######"
+	cd $GARDEN_RELEASE_DIR
+}
+
 create_deployment_dir() {
 	set +e
 	echo "###### Create deployment directory ######"
@@ -327,20 +370,6 @@ generate_diego_deployment_manifest() {
 
 	switch_to_diego_release
 	./scripts/generate-deployment-manifest $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/property-overrides.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/instance-count-overrides.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/persistent-disk-overrides.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/iaas-settings.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/additional-jobs.yml $BOSH_RELEASES_DIR/deployments/bosh-lite > $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml
-
-	export OPTION=0
-
-	while [[ $OPTION -ne 1 ]]; do
-		echo
-		read -p "Have you fixed the diego manifest located at $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml? (y/n): " OPTION
-		if [[ $OPTION = "" || $OPTION = "N" || $OPTION = "n" ]]; then
-			export OPTION=0
-		else
-			export OPTION=1
-		fi
-		echo
-	done
-
 }
 
 generate_and_upload_release() {
@@ -386,8 +415,10 @@ execute_diego_deployment() {
 	echo "###### Installing Diego ######"
 	pre_install
 	sync_diego_repo
+	sync_garden_repo
 	export_cf_release
 	export_diego_release
+	export_garden_linux_release
 
 	export DEPLOYED_RELEASE=`bosh deployments | grep diego/ | cut -d '|' -f3 | cut -d '/' -f2 | cut -d '+' -f1 | sort -u`
 
@@ -409,6 +440,10 @@ execute_diego_deployment() {
 		deploy_release $CF_RELEASE_DIR $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml CF
 
 		bosh deployment $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml &> $LOG_FILE 2>&1
+
+		switch_to_garden_linux_release
+		generate_and_upload_release $GARDEN_RELEASE_DIR garden-linux garden-linux/$GARDEN_LINUX_RELEASE
+
 		generate_and_upload_release $DIEGO_RELEASE_DIR diego $DIEGO_RELEASE
 		echo "###### Deploy diego release ######"
 		deploy_release $DIEGO_RELEASE_DIR $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml DIEGO
@@ -487,6 +522,7 @@ export OS=`uname`
 export BOSH_LITE_DIR=$BOSH_RELEASES_DIR/bosh-lite
 export CF_RELEASE_DIR=$BOSH_RELEASES_DIR/cf-release
 export DIEGO_RELEASE_DIR=$BOSH_RELEASES_DIR/diego-release
+export GARDEN_RELEASE_DIR=$BOSH_RELEASES_DIR/garden-linux-release
 
 if [[ $SELECTION = 1 ]]; then
 	export CF_VERSION_REQUIRED=$RELEASE_VERSION_REQUIRED
