@@ -1,7 +1,5 @@
 #!/bin/bash --login
 
-echo ">>>>>>>>>> Start time: $(date) <<<<<<<<<<<<"
-
 export EXECUTION_DIR=$PWD
 export LOG_FILE=$EXECUTION_DIR/setup.log
 rm -rf $LOG_FILE
@@ -21,8 +19,8 @@ export AWS_STEM_CELL_URL=http://bosh-jenkins-artifacts.s3.amazonaws.com/bosh-ste
 export STEM_CELL_TO_INSTALL=latest-bosh-stemcell-warden.tgz
 export STEM_CELL_URL=$AWS_STEM_CELL_URL/$STEM_CELL_TO_INSTALL
 
-export VAGRANT_VERSION=1.7.2
-export BOSH_RUBY_VERSION=2.2.2
+export VAGRANT_VERSION=1.7.4
+export BOSH_RUBY_VERSION=2.2.3
 
 export RVM_DOWNLOAD_URL=https://get.rvm.io
 
@@ -165,10 +163,22 @@ generate_diego_deployment_manifest() {
 	echo "###### Generating cf release manifest ######"
 
 	switch_to_cf_release
-	./generate_deployment_manifest warden $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_consul_with_cf.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_windows_in_cc.yml $DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_ssh_in_cc.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/property-overrides.yml > $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
+	./generate_deployment_manifest warden \
+		$BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml \
+		$DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_consul_with_cf.yml \
+		$DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_windows_in_cc.yml \
+		$DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_ssh_in_cf.yml \
+		> $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
 
 	switch_to_diego_release
-	./scripts/generate-deployment-manifest $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/property-overrides.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/instance-count-overrides.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/persistent-disk-overrides.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/iaas-settings.yml $DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/additional-jobs.yml $BOSH_RELEASES_DIR/deployments/bosh-lite > $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml
+	./scripts/generate-deployment-manifest $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml \
+		$DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/property-overrides.yml \
+		$DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/instance-count-overrides.yml \
+		$DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/persistent-disk-overrides.yml \
+		$DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/iaas-settings.yml \
+		$DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/additional-jobs.yml \
+		$BOSH_RELEASES_DIR/deployments/bosh-lite \
+		> $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml
 }
 
 generate_and_upload_release() {
