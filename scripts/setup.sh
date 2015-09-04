@@ -1,5 +1,7 @@
 #!/bin/bash --login
 
+echo ">>>>>>>>>> Start time: $(date) <<<<<<<<<<<<"
+
 clear
 unset HISTFILE
 
