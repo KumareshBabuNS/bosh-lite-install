@@ -118,7 +118,7 @@ update_repos() {
 
 	set -e
 	echo "###### Update cf-release to sync the sub-modules ######"
-	./update &> $LOG_FILE
+	./scripts/update &> $LOG_FILE
 }
 
 switch_to_bosh_lite() {
@@ -163,7 +163,7 @@ generate_diego_deployment_manifest() {
 	echo "###### Generating cf release manifest ######"
 
 	switch_to_cf_release
-	./generate_deployment_manifest warden \
+	./scripts/generate_deployment_manifest warden \
 		$BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml \
 		$DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_consul_with_cf.yml \
 		$DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_windows_in_cc.yml \
@@ -293,12 +293,14 @@ setup_dev_environment() {
 }
 
 post_install_activities() {
+  set +e
 	echo "###### Executing BOSH VMS to ensure all VMS are running ######"
 	BOSH_VMS_INSTALLED_SUCCESSFULLY=$( bosh vms | grep -o "failing" )
 	if [ ! -z "$BOSH_VMS_INSTALLED_SUCCESSFULLY" ]; then
 		logError "Not all BOSH VMs are up. Please check logs for more info"
 	fi
 
+  echo "###### Creating Org/Space ######"
 	setup_dev_environment
 
 	if [[ $SELECTION = 2 ]]; then
