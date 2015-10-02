@@ -2,7 +2,7 @@
 
 export CF_USER=admin
 export CF_PASSWORD=admin
-export CLOUD_CONTROLLER_URL=https://api.10.244.0.34.xip.io/
+export CLOUD_CONTROLLER_URL=https://api.bosh-lite.com/
 export ORG_NAME=local
 export SPACE_NAME=development
 
