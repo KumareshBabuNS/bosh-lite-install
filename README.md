@@ -29,10 +29,10 @@ Install Open Source CloudFoundry
 ```
 ######  Install Open Source CloudFoundry ######
 Usage: ./setup.sh <provider> <install-dir> <options>
-	 provider: 	 		 Enter 1 for Virtual Box
-				 			Enter 2 for VMWare Fusion
-	 install-dir:   		 Specify the install directory
-	 -f 			 		Clean install
+	 provider: 	 		Enter 1 for Virtual Box
+				 		Enter 2 for VMWare Fusion
+	 install-dir:   	Specify the install directory
+	 -f 			 	Clean install
 ```
 
 ex: ./setup.sh 1 ~/Documents/cloudfoundry
