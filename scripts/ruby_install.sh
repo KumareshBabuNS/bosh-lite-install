@@ -5,13 +5,13 @@ installRequiredGems () {
 	INSTALLED_BUNDLE_VERSION=`which bundle` >> $LOG_FILE 2>&1
 	if [ -z $INSTALLED_BUNDLE_VERSION ]; then
 		rvm use $1
-		echo "###### Installing Bundler ######"
+		logTrace "Installing Bundler"
 		gem install bundler >> $LOG_FILE 2>&1
 	fi
 
 	INSTALLED_BOSH_CLI=`which bosh`
 	if [ -z $INSTALLED_BOSH_CLI ]; then
-		echo "###### Installing BOSH CLI ######"
+		logTrace "Installing BOSH CLI"
 		gem install bosh_cli >> $LOG_FILE 2>&1
 	fi
 
@@ -28,7 +28,7 @@ installRuby () {
 	logInfo "Validate if $RUBY_VERSION_INSTALLED is installed"
 
 	if [ -z "$RUBY_VERSION_INSTALLED" ]; then
-		logCustom 9 "Ruby not found. I knew you would never read the instructions. I have to install this for you now! Phew!!"
+		logCustom 9 "ALERT: " "Ruby not found. I knew you would never read the instructions. I have to install this for you now! Phew!!"
 		rvm install $1 >> $LOG_FILE 2>&1
 		rvm --default use $BOSH_RUBY_VERSION >> $LOG_FILE 2>&1
 
@@ -43,14 +43,14 @@ installRuby () {
 }
 
 
-echo "###### Install RVM and download the appropriate version of Ruby ######"
+logTrace "Install RVM and download the appropriate version of Ruby"
 
 WHICH_RVM=`which rvm`
 if [ -z "$WHICH_RVM" ]; then
-	logCustom 9 "RVM not found. I knew you would never read the instructions. I have to install this for you now! Phew!!"
+	logCustom 9 "ALERT: " "RVM not found. I knew you would never read the instructions. I have to install this for you now! Phew!!"
 	\curl -sSL $RVM_DOWNLOAD_URL | bash >> $LOG_FILE 2>&1
 
-	echo "Setting RVM for use in this bash session"
+	logTrace "Setting RVM for use in this bash session"
 	`[[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"`
 
 	logInfo "Installed RVM, please fire the script again from a new terminal"
@@ -60,6 +60,6 @@ fi
 installRuby $BOSH_RUBY_VERSION
 
 set +e
-echo "###### Using Ruby $BOSH_RUBY_VERSION ######"
+logTrace "Using Ruby $BOSH_RUBY_VERSION"
 rvm --default use $BOSH_RUBY_VERSION >> $LOG_FILE 2>&1
 logSuccess "Successfully set ruby to $BOSH_RUBY_VERSION."

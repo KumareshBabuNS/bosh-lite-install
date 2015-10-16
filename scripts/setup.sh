@@ -1,22 +1,20 @@
 #!/bin/bash --login
+export EXECUTION_DIR=$PWD
+export LOG_FILE=$EXECUTION_DIR/setup.log
+
+. logMessages.sh
 
 echo ">>>>>>>>>> Start time: $(date) <<<<<<<<<<<<"
 
 clear
 unset HISTFILE
 
-. common.sh
-. cf_install.sh
-. diego_install.sh
-. logMessages.sh
-
-echo "######  Install Open Source CloudFoundry ######"
-if [ $# -lt 2 ]; then
+logTrace "Install Open Source CloudFoundry"
+if [[ $# -lt 2 || $# -gt 3 ]]; then
 	echo "Usage: ./setup.sh <provider> <install-dir> <options>"
 	printf "\t %s \t\t %s \n\t\t\t\t %s \n" "provider:" "Enter 1 for Virtual Box" "Enter 2 for VMWare Fusion"
 	printf "\t %s \t\t %s \n" "install-dir:" "Specify the install directory"
-	printf "\t %s \t\t\t %s \n" "-f" "Force remove old installation and install fresh"
-	printf "\t %s \t\t\t %s \n" "-v=" "version to install"
+	printf "\t %s \t\t\t %s \n" "-f" "Clean install"
 	exit 1
 fi
 
@@ -27,16 +25,8 @@ fi
 export PROVIDER=$1
 export BOSH_RELEASES_DIR=$2
 
-if [[ $3 = "-f" || $4 = "-f" ]]; then
+if [[ $3 = "-f" ]]; then
 	export FORCE_DELETE="-f"
-fi
-
-if [[ $3 == *"-v"* ]]; then
-	export RELEASE_VERSION_REQUIRED=`echo $3 | tr -d '\-v='`
-	echo $RELEASE_VERSION_REQUIRED
-elif [[ $4 == *"-v"* ]]; then
-	export RELEASE_VERSION_REQUIRED=`echo $4 | tr -d '\-v='`
-	echo $RELEASE_VERSION_REQUIRED
 fi
 
 export SELECTION=0
@@ -55,22 +45,25 @@ export BOSH_LITE_DIR=$BOSH_RELEASES_DIR/bosh-lite
 export CF_RELEASE_DIR=$BOSH_RELEASES_DIR/cf-release
 export DIEGO_RELEASE_DIR=$BOSH_RELEASES_DIR/diego-release
 export GARDEN_RELEASE_DIR=$BOSH_RELEASES_DIR/garden-linux-release
+export ETCD_RELEASE_DIR=$BOSH_RELEASES_DIR/etcd-release
 
 export RETAKE_SNAPSHOT=false
+
+. common.sh
+. cf_install.sh
+. diego_install.sh
+. logMessages.sh
 
 pre_install
 
 if [[ $SELECTION = 1 ]]; then
-	export CF_VERSION_REQUIRED=$RELEASE_VERSION_REQUIRED
 	execute_cf_deployment
 elif [[ $SELECTION = 2 ]]; then
-	export DIEGO_VERSION_REQUIRED=$RELEASE_VERSION_REQUIRED
 	execute_diego_deployment
 fi
 
 post_install_activities
 
-echo ">>>>>>>>>> End time: $(date) <<<<<<<<<<<<"
-echo ">>>>>>>>>> End time: $(date) <<<<<<<<<<<<" >> $LOG_FILE
+logInfo ">>>>>>>>>> End time: $(date) <<<<<<<<<<<<"
 
-logSuccess "###### Congratulations: Open Source CloudFoundry setup complete! ######"
+logSuccess "Congratulations: Open Source CloudFoundry setup complete!"

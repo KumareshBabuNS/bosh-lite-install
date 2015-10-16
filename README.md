@@ -29,11 +29,10 @@ Install Open Source CloudFoundry
 ```
 ######  Install Open Source CloudFoundry ######
 Usage: ./setup.sh <provider> <install-dir> <options>
-	 provider: 		    Enter 1 for Virtual Box
-				           Enter 2 for VMWare Fusion
-	 install-dir: 		 Specify the install directory
-	 -f 			       Force remove old installation and install fresh
-	 -v= 			      Version to Install
+	 provider: 	 		 Enter 1 for Virtual Box
+				 			Enter 2 for VMWare Fusion
+	 install-dir:   		 Specify the install directory
+	 -f 			 		Clean install
 ```
 
 ex: ./setup.sh 1 ~/Documents/cloudfoundry
@@ -51,11 +50,10 @@ What happens in the script:
 * Git pull of bosh-lite, cf-release and/or diego-release
 * Installs homebrew if its missing
 * Installs rvm, ruby if its missing
-* Start the VM with the ubuntu box that's packaged with BOSH
-* Latest stemcell is installed into the VM
-* Release build is installed into the VM
-* Finally cf release is deployed into the VM
-* Once all the steps are executed, the CF command cli is installed and the CLI is targetted to your new setup
+* Start the VM with the ubuntu box that's pre-packaged with BOSH
+* Download and upload the latest stemcell is installed into the VM
+* cf-release/diego-release and dependent releases are deployed into the VM
+* Once all the steps are executed, the CF command cli is installed and the CLI is targeted to your new setup
 * New org, spaces are created
 
 Troubleshooting:
@@ -63,6 +61,3 @@ If the script fails due to any reason, look at the errors in the setup.log
 * If any bosh jobs fail to start at the end of the script, run `bosh vms`
 * Look for the Job/s that have the status as failing
 * Run `bosh restart <job-name>`
-
-RoadMap:
-* Enable install on Ubuntu
