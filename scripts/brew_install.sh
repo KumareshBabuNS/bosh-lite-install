@@ -5,12 +5,12 @@ OS=`uname`
 
 BREW_INSTALLED=`which brew`
 if [ -z $BREW_INSTALLED ]; then
-	logCustom 9 "Homebrew not found. I knew you would never read the instructions. I have to install this for you now! Phew!!"
+	logCustom 9 "ALERT: " "Homebrew not found. I knew you would never read the instructions. I have to install this for you now! Phew!!"
 	if [ "$OS" == "Darwin" ]; then
 		logInfo "Installing HomeBrew on Mac"
-		logCustom 6 "When prompted, enter your password"
+		logCustom 6 "INPUT: " "When prompted, enter your password"
 		echo "" | ruby -e "$(curl -fsSL $HOMEBREW_DOWNLOAD_URL)"
-		
+
 		BREW_INSTALLED=`which brew`
 		if [ -z $BREW_INSTALLED	]; then
 			logError "Install Failed, please install brew manually"
@@ -18,7 +18,7 @@ if [ -z $BREW_INSTALLED ]; then
 		fi
 		brew doctor >> $LOG_FILE 2>&1
 		brew update >> $LOG_FILE 2>&1
-		
+
 	elif [ "$OS' == 'Ubuntu" ]; then
 		logInfo Install Linuxbrew on Ubuntu
 		echo $2 | sudo apt-get install build-essential curl git ruby texinfo libbz2-dev libcurl4-openssl-dev libexpat-dev libncurses-dev zlib1g-dev >> $LOG_FILE 2>&1

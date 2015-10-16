@@ -15,12 +15,12 @@ execute() {
 }
 
 clone_repo() {
-	echo "###### Clone Required Git Repositories ######"
+	logTrace "Clone Required Git Repositories"
 	if [ ! -d "$MYSQL_RELEASE_DIR" ]; then
 		git clone $MYSQL_RELEASE_GIT_REPO $MYSQL_RELEASE_DIR >> $LOG_FILE 2>&1
 	fi
-	
-	
+
+
 	cd $MYSQL_RELEASE_DIR
 	./update
 }
@@ -53,7 +53,7 @@ create_service_broker() {
 	bosh run errand broker-registrar &> $LOG_FILE 2>&1
 }
 
-echo "######  Install MySQL Service Broker ######"
+logTrace "Install MySQL Service Broker"
 if [ $# -lt 1 ]; then
 	echo "Usage: ./setup_mysql.sh <install-dir>"
 	printf "\t %s \t\t %s \n" "install-dir:" "Specify the install directory"

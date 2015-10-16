@@ -2,7 +2,7 @@
 . logMessages.sh
 
 set +e
-echo "###### Switching to bosh-lite ######"
+logTrace "Switching to bosh-lite"
 cd $BOSH_RELEASES_DIR/bosh-lite
 
 logInfo "Deleting vagrant box"

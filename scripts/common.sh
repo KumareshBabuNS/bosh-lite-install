@@ -1,7 +1,7 @@
 #!/bin/bash --login
-
 export EXECUTION_DIR=$PWD
 export LOG_FILE=$EXECUTION_DIR/setup.log
+
 rm -rf $LOG_FILE
 
 echo ">>>>>>>>>> Start time: $(date) <<<<<<<<<<<<" >> $LOG_FILE
@@ -14,6 +14,7 @@ export BOSH_LITE_REPO=https://github.com/cloudfoundry/bosh-lite.git
 export CF_RELEASE_REPO=https://github.com/cloudfoundry/cf-release.git
 export DIEGO_RELEASE_REPO=https://github.com/cloudfoundry-incubator/diego-release.git
 export GARDEN_RELEASE_REPO=https://github.com/cloudfoundry-incubator/garden-linux-release.git
+export ETCD_RELEASE_REPO=https://github.com/cloudfoundry-incubator/etcd-release.git
 
 export AWS_STEM_CELL_URL=http://bosh-jenkins-artifacts.s3.amazonaws.com/bosh-stemcell/warden
 export STEM_CELL_TO_INSTALL=latest-bosh-stemcell-warden.tgz
@@ -57,7 +58,7 @@ install_required_tools() {
 
 		INSTALLED_WGET=`which wget`
 		if [ -z $INSTALLED_WGET ]; then
-			echo "###### Installing wget ######"
+			logTrace " Installing wget "
 			brew install wget >> $LOG_FILE 2>&1
 		fi
 	fi
@@ -92,9 +93,30 @@ install_required_tools() {
 	fi
 }
 
+# <repo-dir> <repo-url> <switch_to_release> <bundle-required>
+sync_repo() {
+	if [ ! -d "$BOSH_RELEASES_DIR/$1" ]; then
+		git clone $2 $BOSH_RELEASES_DIR/$1 >> $LOG_FILE 2>&1
+	fi
+
+	set -e
+	switch_to_$3
+
+	if [[ ! -f ./scripts/update ]]; then
+		logTrace "Update $1 to sync the sub-modules"
+		./scripts/update &> $LOG_FILE
+	else
+		git pull &> $LOG_FILE
+	fi
+
+	if [[ $4 == true ]]; then
+		bundle install &> $LOG_FILE
+	fi
+}
+
 update_repos() {
 	set -e
-	echo "###### Clone Required Git Repositories ######"
+	logTrace "Clone Required Git Repositories"
 	if [ ! -d $BOSH_LITE_DIR ]; then
 		git clone $BOSH_LITE_REPO $BOSH_LITE_DIR >> $LOG_FILE 2>&1
 	fi
@@ -111,79 +133,73 @@ update_repos() {
 	switch_to_bosh_lite
 
 	set -e
-	echo "###### Pull latest changes (if any) for bosh-lite ######"
+	logTrace "Pull latest changes (if any) for bosh-lite"
 	git pull >> $LOG_FILE 2>&1
 
 	switch_to_cf_release
 
 	set -e
-	echo "###### Update cf-release to sync the sub-modules ######"
+	logTrace "Update cf-release to sync the sub-modules"
 	./scripts/update &> $LOG_FILE
 }
 
 switch_to_bosh_lite() {
 	set +e
-	echo "###### Switching to bosh-lite ######"
+	logTrace "Switching to bosh-lite"
 	cd $BOSH_LITE_DIR
 }
 
 switch_to_cf_release() {
 	set +e
-	echo "###### Switching to cf-release ######"
+	logTrace "Switching to cf-release"
 	cd $CF_RELEASE_DIR
 }
 
 switch_to_diego_release() {
 	set +e
-	echo "###### Switching to diego-release ######"
+	logTrace "Switching to diego-release"
 	cd $DIEGO_RELEASE_DIR
 }
 
 switch_to_garden_linux_release() {
 	set +e
-	echo "###### Switching to garden-linux-release ######"
+	logTrace "Switching to garden-linux-release"
 	cd $GARDEN_RELEASE_DIR
+}
+
+switch_to_etcd_release() {
+	set +e
+	logTrace "Switching to etcd-release"
+	cd $ETCD_RELEASE_DIR
 }
 
 create_deployment_dir() {
 	set +e
-	echo "###### Create deployment directory ######"
+	logTrace "Create deployment directory"
 	mkdir -p $BOSH_RELEASES_DIR/deployments/bosh-lite
 }
 
 generate_diego_deployment_stub() {
 	set +e
-	echo "###### Generating Diego deployment stub ######"
+	logTrace "Generating Diego deployment stub"
 	switch_to_diego_release
-	./scripts/print-director-stub > $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml
+	./scripts/print-director-stub > $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml >> $LOG_FILE 2>&1
 }
 
 generate_diego_deployment_manifest() {
 	set -e
-	echo "###### Generating cf release manifest ######"
+	logTrace "Generating cf release manifest"
 
 	switch_to_cf_release
-	./scripts/generate_deployment_manifest warden \
-		$BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml \
-		$DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_consul_with_cf.yml \
-		$DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_windows_in_cc.yml \
-		$DIEGO_RELEASE_DIR/stubs-for-cf-release/enable_diego_ssh_in_cf.yml \
-		> $BOSH_RELEASES_DIR/deployments/bosh-lite/cf.yml
+	./scripts/generate-bosh-lite-dev-manifest >> $LOG_FILE 2>&1
 
 	switch_to_diego_release
-	./scripts/generate-deployment-manifest $BOSH_RELEASES_DIR/deployments/bosh-lite/director.yml \
-		$DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/property-overrides.yml \
-		$DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/instance-count-overrides.yml \
-		$DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/persistent-disk-overrides.yml \
-		$DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/iaas-settings.yml \
-		$DIEGO_RELEASE_DIR/manifest-generation/bosh-lite-stubs/additional-jobs.yml \
-		$BOSH_RELEASES_DIR/deployments/bosh-lite \
-		> $BOSH_RELEASES_DIR/deployments/bosh-lite/diego.yml
+	./scripts/generate-bosh-lite-manifests >> $LOG_FILE 2>&1
 }
 
 generate_and_upload_release() {
 	cd $1
-	logCustom 9 "###### Upload $2-release $3 ######"
+	logCustom 9 "ALERT: " "Upload $2-release $3 "
 	bosh -n upload release releases/$3 >> $LOG_FILE 2>&1
 }
 
@@ -194,7 +210,7 @@ deploy_release() {
 	bosh deployment $2 &> $LOG_FILE 2>&1
 
 	set +e
-	logCustom 9 "###### Deploy $3 to BOSH-LITE (THIS WOULD TAKE SOME TIME) ######"
+	logCustom 9 "ALERT: " "Deploy $3 to BOSH-LITE (THIS WOULD TAKE SOME TIME) "
 	bosh -n deploy &> $LOG_FILE 2>&1
 }
 
@@ -202,7 +218,7 @@ validate_deployed_release() {
 	set -e
 	export CONTINUE_INSTALL=true
 
-	echo "Deployed version " $1 " and new version " $2
+	logInfo "Deployed version $1 and new version $2"
 	if [[ $1 != '' ]]; then
 		if [[ "$1" = "$2" ]]; then
 			logInfo "You're already on the current version, skipping deployment"
@@ -214,6 +230,7 @@ validate_deployed_release() {
 				bosh -n delete deployment cf-warden-diego --force &> $LOG_FILE 2>&1
 				bosh -n delete release diego --force &> $LOG_FILE 2>&1
 				bosh -n delete release garden-linux --force &> $LOG_FILE 2>&1
+				bosh -n delete release etcd --force &> $LOG_FILE 2>&1
 			fi
 			bosh -n delete deployment cf-warden --force &> $LOG_FILE 2>&1
 			bosh -n delete release cf --force &> $LOG_FILE 2>&1
@@ -226,7 +243,7 @@ vagrant_up() {
 	switch_to_bosh_lite
 
 	set -e
-	echo "###### Vagrant up ######"
+	logTrace "Vagrant up"
 	if [ $PROVIDER -eq 1 ]; then
 		if [ $PLUGIN_INSTALLED == true ]; then
 			logInfo "Found VMWare Fusion plugin, uninstalling it"
@@ -247,13 +264,13 @@ vagrant_up() {
 		vagrant up --provider=vmware_fusion >> $LOG_FILE 2>&1
 	fi
 
-	echo "###### Target BOSH to BOSH director ######"
+	logTrace "Target BOSH to BOSH director"
 	bosh target $BOSH_DIRECTOR_URL
 
-	echo "###### Setup bosh target and login ######"
+	logTrace "Setup bosh target and login"
 	bosh login $BOSH_USER $BOSH_PASSWORD
 
-	echo "###### Set the routing tables ######"
+	logTrace "Set the routing tables"
 	echo $PASSWORD | sudo -S bin/add-route >> $LOG_FILE 2>&1
 
 }
@@ -262,21 +279,41 @@ download_and_upload_stemcell() {
 	switch_to_bosh_lite
 
 	set -e
-	echo "###### Download latest warden stemcell ######"
+	logTrace "Download latest warden stemcell"
 	if [ ! -f $STEM_CELL_TO_INSTALL ]; then
-		echo "###### Downloading... warden ######"
+		logTrace "Downloading... warden"
 		wget --progress=bar:force $STEM_CELL_URL -o $LOG_FILE 2>&1
 	else
-		echo "###### Warden Stemcell already exists ######"
+		logTrace "Warden Stemcell already exists"
 	fi
 
 	set +e
-	echo "###### Upload stemcell ######"
+	logTrace "Upload stemcell"
 	bosh upload stemcell --skip-if-exists $BOSH_LITE_DIR/$STEM_CELL_TO_INSTALL >> $LOG_FILE 2>&1
 
 	set -e
 	STEM_CELL_NAME=$( bosh stemcells | grep -o "bosh-warden-[^[:space:]]*" )
-	echo "###### Uploaded stemcell $STEM_CELL_NAME ######"
+	logTrace "Uploaded stemcell $STEM_CELL_NAME"
+}
+
+# <releases-dir> <release-name>
+export_release() {
+	set -e
+
+	export RELEASE_VERSION=`tail -2 $1/index.yml | head -1 | cut -d':' -f2 | cut -d' ' -f2`
+
+	if [[ -n ${RELEASE_VERSION//[0-9]/} ]]; then
+		export RELEASE_VERSION=`echo $RELEASE_VERSION | tr -d "'"`
+	fi
+
+	logInfo "Latest version of $2 is: $RELEASE_VERSION"
+	export RELEASE=$2-$RELEASE_VERSION.yml
+	logInfo "Deploy $2 release $RELEASE"
+
+	logTrace "Validate the entered $2 version"
+	if [ ! -f $1/$RELEASE ]; then
+		logError "Invalid $2 version selected. Please correct and try again"
+	fi
 }
 
 pre_install() {
@@ -289,18 +326,18 @@ pre_install() {
 }
 
 setup_dev_environment() {
-	$EXECUTION_DIR/setup_cf_commandline.sh
+	cd $EXECUTION_DIR && $EXECUTION_DIR/setup_cf_commandline.sh
 }
 
 post_install_activities() {
   set +e
-	echo "###### Executing BOSH VMS to ensure all VMS are running ######"
-	BOSH_VMS_INSTALLED_SUCCESSFULLY=$( bosh vms | grep -o "failing" )
+	sleep 2 && logTrace "Executing BOSH VMS to ensure all VMS are running"
+	BOSH_VMS_INSTALLED_SUCCESSFULLY=`bosh vms | grep -o "failing"`
 	if [ ! -z "$BOSH_VMS_INSTALLED_SUCCESSFULLY" ]; then
 		logError "Not all BOSH VMs are up. Please check logs for more info"
 	fi
 
-  echo "###### Creating Org/Space ######"
+  logTrace "Creating Org/Space"
 	setup_dev_environment
 
 	if [[ $SELECTION = 2 ]]; then
@@ -315,7 +352,7 @@ post_install_activities() {
 			if [[ $RETAKE_SNAPSHOT = true ]]; then
 				vagrant snap delete --name=original
 			fi
-			vagrant snap take --name=original
+			vagrant suspend && vagrant snap take --name=original
 		fi
 	fi
 }
