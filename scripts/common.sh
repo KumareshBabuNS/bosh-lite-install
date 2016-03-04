@@ -16,12 +16,11 @@ export DIEGO_RELEASE_REPO=https://github.com/cloudfoundry-incubator/diego-releas
 export GARDEN_RELEASE_REPO=https://github.com/cloudfoundry-incubator/garden-linux-release.git
 export ETCD_RELEASE_REPO=https://github.com/cloudfoundry-incubator/etcd-release.git
 
-export AWS_STEM_CELL_URL=http://bosh-jenkins-artifacts.s3.amazonaws.com/bosh-stemcell/warden
-export STEM_CELL_TO_INSTALL=latest-bosh-stemcell-warden.tgz
-export STEM_CELL_URL=$AWS_STEM_CELL_URL/$STEM_CELL_TO_INSTALL
+export STEMCELL_URL=https://bosh.io/d/stemcells/bosh-warden-boshlite-ubuntu-trusty-go_agent
+export STEMCELL_TO_INSTALL=latest-bosh-lite-stemcell.tgz
 
 export VAGRANT_VERSION=1.7.4
-export BOSH_RUBY_VERSION=2.2.3
+export BOSH_RUBY_VERSION=2.3.0
 
 export RVM_DOWNLOAD_URL=https://get.rvm.io
 
@@ -123,11 +122,12 @@ update_repos() {
 
 	if [[ $FORCE_DELETE = "-f" ]]; then
 		$EXECUTION_DIR/perform_cleanup.sh
-		#rm -rf $BOSH_LITE_DIR/$STEM_CELL_TO_INSTALL
+		rm -rf $BOSH_LITE_DIR/$STEMCELL_TO_INSTALL
 	fi
 
 	if [ ! -d $CF_RELEASE_DIR ]; then
 		git clone $CF_RELEASE_REPO $CF_RELEASE_DIR >> $LOG_FILE 2>&1
+		rm -rf Gemfile.lock
 	fi
 
 	switch_to_bosh_lite
@@ -199,6 +199,7 @@ generate_diego_deployment_manifest() {
 
 generate_and_upload_release() {
 	cd $1
+	rm -rf Gemfile.lock
 	logCustom 9 "ALERT: " "Upload $2-release $3 "
 	bosh -n upload release releases/$3 >> $LOG_FILE 2>&1
 }
@@ -234,7 +235,6 @@ validate_deployed_release() {
 			fi
 			bosh -n delete deployment cf-warden --force &> $LOG_FILE 2>&1
 			bosh -n delete release cf --force &> $LOG_FILE 2>&1
-			export RETAKE_SNAPSHOT=true
 		fi
 	fi
 }
@@ -280,16 +280,16 @@ download_and_upload_stemcell() {
 
 	set -e
 	logTrace "Download latest warden stemcell"
-	if [ ! -f $STEM_CELL_TO_INSTALL ]; then
+	if [ ! -f $STEMCELL_TO_INSTALL ]; then
 		logTrace "Downloading... warden"
-		wget --progress=bar:force $STEM_CELL_URL -o $LOG_FILE 2>&1
+		wget --progress=bar:force $STEMCELL_URL -O $STEMCELL_TO_INSTALL -o $LOG_FILE 2>&1
 	else
 		logTrace "Warden Stemcell already exists"
 	fi
 
 	set +e
 	logTrace "Upload stemcell"
-	bosh upload stemcell --skip-if-exists $BOSH_LITE_DIR/$STEM_CELL_TO_INSTALL >> $LOG_FILE 2>&1
+	bosh upload stemcell --skip-if-exists $BOSH_LITE_DIR/$STEMCELL_TO_INSTALL >> $LOG_FILE 2>&1
 
 	set -e
 	STEM_CELL_NAME=$( bosh stemcells | grep -o "bosh-warden-[^[:space:]]*" )
@@ -330,13 +330,6 @@ setup_dev_environment() {
 }
 
 post_install_activities() {
-  set +e
-	sleep 2 && logTrace "Executing BOSH VMS to ensure all VMS are running"
-	BOSH_VMS_INSTALLED_SUCCESSFULLY=`bosh vms | grep -o "failing"`
-	if [ ! -z "$BOSH_VMS_INSTALLED_SUCCESSFULLY" ]; then
-		logError "Not all BOSH VMs are up. Please check logs for more info"
-	fi
-
   logTrace "Creating Org/Space"
 	setup_dev_environment
 
@@ -344,15 +337,22 @@ post_install_activities() {
 		cf enable-feature-flag diego_docker
 	fi
 
-	cd $BOSH_LITE_DIR
+	switch_to_bosh_lite
 
-	if [[ $CONTINUE_INSTALL = true ]]; then
-		IS_VAGRANT_SNAPSHOT_PLUGIN_AVAILABLE=`vagrant plugin list | grep vagrant-multiprovider-snap`
-		if [[ $IS_VAGRANT_SNAPSHOT_PLUGIN_AVAILABLE != '' ]]; then
-			if [[ $RETAKE_SNAPSHOT = true ]]; then
-				vagrant snap delete --name=original
-			fi
-			vagrant suspend && vagrant snap take --name=original
-		fi
+	IS_VAGRANT_SNAPSHOT_PLUGIN_AVAILABLE=`vagrant plugin list | grep vagrant-multiprovider-snap`
+	if [[ ! -z $IS_VAGRANT_SNAPSHOT_PLUGIN_AVAILABLE ]]; then
+		logTrace "Taking snapshot of the VM"
+		vagrant snap delete --name=original
+		vagrant suspend && vagrant snap take --name=original
+	fi
+
+	vagrant up && ./bin/add-route
+
+	set +e
+	logTrace "Executing BOSH VMS to ensure all VMS are running"
+	BOSH_VMS_INSTALLED_SUCCESSFULLY=`bosh vms | grep -o failing`
+	echo "Output of bosh vms is $BOSH_VMS_INSTALLED_SUCCESSFULLY"
+	if [[ ! -z $BOSH_VMS_INSTALLED_SUCCESSFULLY ]]; then
+		logInfo "Not all BOSH VMs are up. Please check bosh logs for more info. This is false/positive"
 	fi
 }
